@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- README for a human: entities only (files, arrows, status), never a rule or a tunable number. The folder's only README: no README.md beside it. Opens with a double-click; one self-contained file. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROJECT-NAME</title>
+<style>
+  :root {
+    --bg: #fafaf8; --fg: #1d1d1f; --muted: #6b6b70; --card: #ffffff; --line: #d8d8dc;
+    --live: #2e8b57; --partial: #c98a00; --broken: #c0392b; --planned: #8a8a90;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161618; --fg: #ececf0; --muted: #9a9aa2; --card: #212124; --line: #3a3a3f;
+      --live: #5cc28a; --partial: #e0b040; --broken: #e8695c; --planned: #8a8a90;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { margin: 0 0 4px; font-size: 28px; }
+  h2 { margin: 40px 0 12px; font-size: 18px; }
+  .lead { color: var(--muted); margin: 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  svg text { fill: var(--fg); font: 13px -apple-system, system-ui, sans-serif; }
+  svg .file { fill: var(--muted); font: 11px ui-monospace, Menlo, monospace; }
+  svg .box { fill: var(--card); stroke-width: 2; }
+  svg .live { stroke: var(--live); } svg .partial { stroke: var(--partial); }
+  svg .broken { stroke: var(--broken); } svg .planned { stroke: var(--planned); stroke-dasharray: 6 4; }
+  svg .edge { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; color: var(--muted); font-size: 13px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  pre { margin: 0; font: 13px/1.5 ui-monospace, Menlo, monospace; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  code { font: 12.5px ui-monospace, Menlo, monospace; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 13px; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PROJECT-NAME</h1>
+  <p class="lead">One line: what this does, for whom. · Updated YYYY-MM-DD</p>
+
+  <h2>The big picture</h2>
+  <div class="card">
+    <!-- Hand-drawn SVG: no library, works offline. One <g> per component; class = its status. -->
+    <svg viewBox="0 0 760 140" width="100%" role="img" aria-label="Pipeline: ingest, process, report">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color: var(--muted)"/></marker></defs>
+      <g><rect class="box live" x="10" y="30" width="200" height="70" rx="8"/><text x="30" y="60">1 · ingest</text><text class="file" x="30" y="82">ingest.py</text></g>
+      <path class="edge" d="M210,65 L280,65"/><text class="file" x="218" y="55">raw.csv</text>
+      <g><rect class="box partial" x="280" y="30" width="200" height="70" rx="8"/><text x="300" y="60">2 · process</text><text class="file" x="300" y="82">process.py</text></g>
+      <path class="edge" d="M480,65 L550,65"/><text class="file" x="484" y="55">clean.parquet</text>
+      <g><rect class="box planned" x="550" y="30" width="200" height="70" rx="8"/><text x="570" y="60">3 · report</text><text class="file" x="570" y="82">report.py</text></g>
+    </svg>
+    <div class="legend">
+      <span><span class="dot" style="background: var(--live)"></span>live</span>
+      <span><span class="dot" style="background: var(--partial)"></span>partial</span>
+      <span><span class="dot" style="background: var(--broken)"></span>broken</span>
+      <span><span class="dot" style="background: var(--planned)"></span>planned</span>
+    </div>
+  </div>
+
+  <h2>Folder map</h2>
+  <div class="card"><pre>PROJECT-NAME/
+├── AGENTS.md          rules for agents (Claude and Codex)
+├── doc/               companion files for the code
+└── src/               …</pre></div>
+
+  <h2>Components</h2>
+  <div class="card">
+    <table>
+      <tr><th>Component</th><th>Files</th><th>Status</th></tr>
+      <tr><td>1 · ingest</td><td><code>ingest.py</code></td><td><span class="dot" style="background: var(--live)"></span>live</td></tr>
+      <tr><td>2 · process</td><td><code>process.py</code></td><td><span class="dot" style="background: var(--partial)"></span>partial</td></tr>
+      <tr><td>3 · report</td><td><code>report.py</code></td><td><span class="dot" style="background: var(--planned)"></span>planned</td></tr>
+    </table>
+  </div>
+
+  <footer>Rules for agents: <a href="AGENTS.md">AGENTS.md</a> · Design: <a href="DESIGN.md">DESIGN.md</a></footer>
+</main>
+</body>
+</html>

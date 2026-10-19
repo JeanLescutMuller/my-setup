@@ -10,11 +10,12 @@ mean before editing anything:
 - Repository-development feedback belongs in this repository-root
   `AGENTS.md` (no `CLAUDE.md`: Claude reads `AGENTS.md` directly).
 - General machine-wide instructions (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`)
-  live in `~/dev/my-context/init/AGENTS_LOCAL.md` since 2026-10-16, not here.
+  live in `files/AGENTS_LOCAL.md` (since 2026-10-19), joined by `context-sync` with
+  `AGENTS_SHARED.md` from the Drive folder `Personal/my-context/` (modules/my_context.sh).
 
 Infer from the request whether an unqualified `AGENTS.md` or `CLAUDE.md`
 request means this repository's `AGENTS.md` or the machine-wide rules in
-`my-context`, and ask when it remains ambiguous.
+`files/AGENTS_LOCAL.md`, and ask when it remains ambiguous.
 
 ## Deferred work
 

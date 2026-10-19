@@ -2,7 +2,7 @@
 # Removes what modules/agent_links.sh deploys: the skill links
 # in ~/.claude/skills and ~/.agents/skills
 # (only links that point into ~/opt/my-setup), then the read-only copies
-# they point to; the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc.
+# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc.
 # Dotfiles, the shell rc block, git config and the tools are left alone.
 #
 # Usage: bash uninstall.sh
@@ -34,6 +34,28 @@ for copy in "$OPT_DIR/home_AGENTS.md" "$OPT_DIR/skills"; do
         installed "removed $copy"
     fi
 done
+
+step "my-context"
+_ctx="$OPT_DIR/context"
+if [ "$(uname)" = Darwin ]; then
+    _cs_label="com.jeanlescut.my-setup.context-sync"
+    launchctl bootout "gui/$(id -u)/$_cs_label" 2>/dev/null && installed "stopped $_cs_label"
+    _remove_link "$HOME/Library/LaunchAgents/$_cs_label.plist" "$OPT_DIR/$_cs_label.plist"
+    for f in "$OPT_DIR/$_cs_label.plist" "$OPT_DIR/context-sync.sh" "$OPT_DIR/context-sync.conf"; do
+        [ -f "$f" ] && rm "$f" && installed "removed $f"
+    done
+fi
+_remove_link "$HOME/.claude/CLAUDE.md" "$_ctx/AGENTS.md"
+_remove_link "$HOME/.codex/AGENTS.md" "$_ctx/AGENTS.md"
+_remove_link "$HOME/.local/bin/context-sync" "$_ctx/context-sync"
+_remove_link "$HOME/.local/bin/context-history" "$_ctx/context-history"
+for dst in "$_ctx"/snapshot/skills/*/; do
+    [ -d "$dst" ] || continue
+    for home in "$HOME/.claude/skills" "$HOME/.agents/skills"; do
+        _remove_link "$home/$(basename "$dst")" "${dst%/}"
+    done
+done
+warn "kept $_ctx (the local copy and history.git): agents now start without the machine-wide rules"
 
 step "remote control service"
 if [ "$(uname)" = Darwin ]; then

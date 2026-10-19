@@ -91,7 +91,7 @@ def skill_dirs() -> dict:
 l_rows = []  # (item, init tokens, on-use tokens, claude, codex, description)
 SHOW_DESC = "--descriptions" in sys.argv
 
-# Instructions: ~/.claude/CLAUDE.md for Claude, ~/.codex/AGENTS.md for Codex (both symlinks to ~/opt/my-context/init/AGENTS_LOCAL.md)
+# Instructions: ~/.claude/CLAUDE.md for Claude, ~/.codex/AGENTS.md for Codex (both symlinks to ~/opt/my-setup/context/AGENTS.md: files/AGENTS_LOCAL.md + the Drive's AGENTS_SHARED.md)
 claude_md, codex_md = HOME / ".claude/CLAUDE.md", HOME / ".codex/AGENTS.md"
 same = claude_md.exists() and codex_md.exists() and claude_md.resolve() == codex_md.resolve()
 if same:

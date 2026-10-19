@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ensures ~/dev, ~/opt, ~/.local/bin exist.
-# ~/opt here always means the user-level dir - see my-context/init/AGENTS_LOCAL.md for the
+# ~/opt here always means the user-level dir - see files/AGENTS_LOCAL.md for the
 # distinction from the root-owned system /opt on Linux.
 step "directory layout"
 

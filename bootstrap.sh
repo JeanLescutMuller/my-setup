@@ -106,7 +106,7 @@ _deploy_dotfile() {
 }
 
 # Own binaries: real file under ~/opt/my-setup/bin/, symlinked from
-# ~/.local/bin/ (per the machine-wide rules' rule (my-context/init/AGENTS_LOCAL.md) that ~/.local/bin holds only
+# ~/.local/bin/ (per the machine-wide rules' rule (files/AGENTS_LOCAL.md) that ~/.local/bin holds only
 # symlinks into ~/opt/<project>/, never real files - same pattern as
 # agent-session-manager's asm or notify's own binary). Shape
 # mirrors DOTFILES: source name in files/, bin name on PATH.
@@ -230,10 +230,6 @@ for entry in "${DOTFILES[@]}"; do
     _deploy_dotfile "${entry%%:*}" "${entry#*:}"
 done
 
-for entry in "${AGENT_INSTRUCTION_LINKS[@]}"; do
-    _deploy_instruction_link "${entry%%:*}" "${entry#*:}"
-done
-
 # The machine's name is its hand-set HostName (skill
 # machine-name): without one, macOS takes it from the network and it
 # drifts. Check only - setting it needs sudo, which this script never runs.
@@ -272,7 +268,7 @@ case "$(basename "$SHELL")" in
 esac
 
 # --- Modules: real logic (branching, external calls) lives here. ---
-MODULES=(dev_layout gitconfig agent_links claude_config tools remote_control)
+MODULES=(dev_layout gitconfig agent_links my_context claude_config tools remote_control)
 
 TARGET="${1:-}"
 if [ -n "$TARGET" ]; then

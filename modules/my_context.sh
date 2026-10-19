@@ -4,7 +4,8 @@
 #   files/AGENTS_LOCAL.md        -> ~/opt/my-setup/context/AGENTS_LOCAL.md (read-only)
 #   files/context_sync.sh        -> ~/opt/my-setup/context/context-sync     <- ~/.local/bin/context-sync
 #   files/context_history.sh     -> ~/opt/my-setup/context/context-history  <- ~/.local/bin/context-history
-#   files/context_drive_pull.py  -> ~/opt/my-setup/context/context-drive-pull (context-sync's way in when ~/gdrive is forbidden)
+#   files/context_drive.py       -> ~/opt/my-setup/context/context-drive (the Drive API: context-sync's way in when ~/gdrive is
+#                                   forbidden, and the copies of other repos' files for Gemini)
 #   context-sync, run here: snapshot/ (read-only copy of the Drive folder), AGENTS.md (AGENTS_LOCAL.md + AGENTS_SHARED.md),
 #                           the life skills' links in ~/.claude/skills and ~/.agents/skills
 #   ~/opt/my-setup/context/AGENTS.md <- ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md
@@ -39,7 +40,8 @@ _ctx_link() {
 _ctx_copy AGENTS_LOCAL.md "$CTX/AGENTS_LOCAL.md" a-w
 _ctx_copy context_sync.sh "$CTX/context-sync" 555
 _ctx_copy context_history.sh "$CTX/context-history" 555
-_ctx_copy context_drive_pull.py "$CTX/context-drive-pull" 555
+_ctx_copy context_drive.py "$CTX/context-drive" 555
+[ -f "$CTX/context-drive-pull" ] && [ "$INSTALL" = "true" ] && rm "$CTX/context-drive-pull" && installed "removed old $CTX/context-drive-pull"
 _ctx_link "$HOME/.local/bin/context-sync" "$CTX/context-sync"
 _ctx_link "$HOME/.local/bin/context-history" "$CTX/context-history"
 

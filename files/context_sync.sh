@@ -3,13 +3,15 @@
 # facts, shared rules and life skills, since 2026-10-19), and keeps its history. Deployed by modules/my_context.sh to
 # ~/opt/my-setup/context/context-sync (on the PATH); run by agents right after an edit there, and every 15 min by the
 # job my-setup.context-sync (files/context-sync.entrypoint.sh).
-# Reads:  ~/gdrive/Personal/my-context/ (Google Drive for Desktop; else the Drive API through context-drive-pull),
+# Reads:  ~/gdrive/Personal/my-context/ (Google Drive for Desktop; else the Drive API through context-drive), but not its
+#         from_repos/ (copies for Gemini, below),
 #         ~/opt/my-setup/context/AGENTS_LOCAL.md
 # Writes: ~/opt/my-setup/context/snapshot/  read-only copy of the Drive folder: what agents load (kept when the Drive is unreachable)
 #         ~/opt/my-setup/context/AGENTS.md  AGENTS_LOCAL.md + snapshot/AGENTS_SHARED.md, read-only (~/.claude/CLAUDE.md, ~/.codex/AGENTS.md)
 #         ~/.claude/skills/<name>, ~/.agents/skills/<name> -> snapshot/skills/<name>/
 #         ~/opt/my-setup/context/history.git  a commit per change (its work tree: snapshot/), pushed to GitHub my-context
 #         the VM, from the Mac: snapshot/, then context-sync there (it has no Drive: it builds from that copy)
+#         the Drive's from_repos/, from the Mac: the other repos' files Gemini needs (context-drive repo-copies)
 # Usage:  context-sync [-m "what changed and why"] [--agent "claude-code (claude-opus-5-5)"]
 #         without -m, a change found is committed as "unattributed".
 # Exit:   0 done; 3 the Drive folder unreachable: the last copy kept and loaded; 1 an error (AGENTS.md left as it was).
@@ -42,11 +44,11 @@ _copy_from_drive() {
     rm -rf "$SNAP.new"
     if _limit 30 test -s "$SRC/AGENTS_SHARED.md" \
         && _limit 300 rsync -rlt --prune-empty-dirs --exclude='.DS_Store' --exclude='*.gdoc' --exclude='*.gsheet' --exclude='*.gslides' \
-               --exclude='.tmp*' --exclude='Icon?' "$SRC/" "$SNAP.new/" 2>/dev/null; then
+               --exclude='.tmp*' --exclude='Icon?' --exclude='/from_repos' "$SRC/" "$SNAP.new/" 2>/dev/null; then
         return 0
     fi
     rm -rf "$SNAP.new"
-    [ -z "${CONTEXT_SRC:-}" ] && [ -x "$CTX/context-drive-pull" ] && _limit 300 "$CTX/context-drive-pull" "$SNAP.new" >/dev/null \
+    [ -z "${CONTEXT_SRC:-}" ] && [ -x "$CTX/context-drive" ] && _limit 300 "$CTX/context-drive" pull "$SNAP.new" >/dev/null \
         && echo "~/gdrive not readable here: read through the Drive API"
 }
 
@@ -124,7 +126,12 @@ Session: $session" && echo "history: $(git log -1 --format='%h %s')"
     unset GIT_DIR GIT_WORK_TREE
 fi
 
-# --- 5. The VM, from the Mac: the same copy, then its own AGENTS.md
+# --- 5. The Mac: the other repos' files Gemini needs, copied to the Drive's from_repos/ (Gemini cannot read GitHub)
+if [ "$m" = chan-lescut-macbook-pro ] && [ -d "$HOME/dev" ] && [ -x "$CTX/context-drive" ] && [ -z "${CONTEXT_SRC:-}" ]; then
+    _limit 300 "$CTX/context-drive" repo-copies 2>&1 || echo "WARN: the repo copies for Gemini not updated"
+fi
+
+# --- 6. The VM, from the Mac: the same copy, then its own AGENTS.md
 if [ "$m" = chan-lescut-macbook-pro ] && [ -d "$SNAP" ] && [ -z "${CONTEXT_NO_VM:-}" ]; then
     if _limit 120 rsync -rlt --delete -e 'ssh -o BatchMode=yes -o ConnectTimeout=10' "$SNAP/" "$VM:opt/my-setup/context/snapshot/" >/dev/null 2>&1 \
         && _limit 60 ssh -o BatchMode=yes -o ConnectTimeout=10 "$VM" 'bash ~/opt/my-setup/context/context-sync' >/dev/null 2>&1; then

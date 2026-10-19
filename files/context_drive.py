@@ -23,6 +23,8 @@ FOLDER = "application/vnd.google-apps.folder"
 COPIES = "from_repos"
 REPO_FILES = [("task-management", "skills/task-management/SKILL.md"),
               ("job-applications", "skills/application-writing/SKILL.md"),
+              ("job-applications", "skills/application-writing/references/rules.md"),     # SKILL.md: "read it first"
+              ("job-applications", "skills/application-writing/references/html-cv.md"),
               ("learning-german", "README.md")]
 HEADER = ("> Copy of `{path}` in the GitHub repo `JeanLescutMuller/{repo}`, for Gemini, made by context-sync (my-setup). "
           "Never edit it here: edit the repo; the next sync replaces this copy.\n\n")

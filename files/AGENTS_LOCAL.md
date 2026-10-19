@@ -96,7 +96,8 @@ Before the first browser action of a session, `select_browser` by deviceId (the 
 
 | Chrome profile | deviceId | Use for |
 |---|---|---|
-| Claude - general | `331a94e7-f123-4e09-a755-cdc63980187f` | everything by default; also LinkedIn and job-applications (it is logged in to LinkedIn) |
+| Claude - general | `331a94e7-f123-4e09-a755-cdc63980187f` | everything by default (not logged in to LinkedIn since 2026-10-19) |
+| Claude - auto-job-apply | `f16617c3-d0dc-425b-a7a4-d925eec10bf5` | only `~/dev/job-applications` (auto-job-apply, LinkedIn): logged in to LinkedIn, not to Google; never anything else (user, 2026-10-19) |
 | Personal | `7ffa990a-3bd4-46be-bf9e-871ec9870f9a` | only pages that need the user's Google login (Google One, Gmail web…) |
 | Claude - Facebook | `db5922d3-1713-4df0-a025-1ac608fac5f1` | only Facebook Marketplace for `~/dev/marketplace-seller` (logged in to the user's secondary Facebook account); never anything else, and nothing else ever uses Facebook |
 

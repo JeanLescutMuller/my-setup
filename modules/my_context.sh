@@ -8,6 +8,7 @@
 #   context-sync, run here: snapshot/ (read-only copy of the Drive folder), AGENTS.md (AGENTS_LOCAL.md + AGENTS_SHARED.md),
 #                           the life skills' links in ~/.claude/skills and ~/.agents/skills
 #   ~/opt/my-setup/context/AGENTS.md <- ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md
+#   ~/gdrive/Personal/my-context <- ~/dev/my-context (the Mac: where the repo was)
 #   the Mac only (it has the Drive): history.git (a bare clone of GitHub my-context) and the job my-setup.context-sync
 #   (files/context-sync.entrypoint.sh -> ~/opt/my-setup/context-sync.sh, LaunchAgent every 15 min, job-runner)
 # Then the old deploy of the repo my-context (~/opt/my-context/) goes, once nothing links into it. uninstall.sh undoes it.
@@ -69,6 +70,15 @@ if [ -s "$CTX/AGENTS.md" ]; then
     _ctx_link "$HOME/.codex/AGENTS.md" "$CTX/AGENTS.md"
 else
     fail "$CTX/AGENTS.md missing - ~/.claude/CLAUDE.md and ~/.codex/AGENTS.md left as they are"
+fi
+
+# ~/dev/my-context: a link to the Drive folder (the user, 2026-10-19), where the repo was; never over a real folder.
+if [ -d "$HOME/dev" ] && [ -e "$HOME/gdrive" ]; then
+    if [ -d "$HOME/dev/my-context" ] && [ ! -L "$HOME/dev/my-context" ]; then
+        warn "$HOME/dev/my-context is a real folder (the old repo?) - not linked"
+    else
+        _ctx_link "$HOME/dev/my-context" "$HOME/gdrive/Personal/my-context"
+    fi
 fi
 
 # The job, on the Mac (with job-runner): context-sync every 15 min.

@@ -62,7 +62,7 @@ Keep the whole thing to a screenful. It is a map, not a report.
 
 # Folders
 
-- `~/dev/<repo>` — all source repos, flat; the folder name is the real GitHub repo name (`git remote -v`).
+- `~/dev/<repo>` — all source repos, flat; the folder name is the real GitHub repo name (`git remote -v`). One exception: `~/dev/my-context` is a link to the Drive folder `Personal/my-context/` (the source of the user's context, no repo; made by my-setup).
 - `~/opt/<repo>/` — what is deployed: run by a scheduler, put on the PATH, or loaded by agents (skills, this file), with its logs and state. Written only by the repo's `install.sh`. Anything run by hand stays in `~/dev`.
 - Outside a repo, only symlinks into `~/opt`. Each repo's `install.sh` (my-setup: `bootstrap.sh`) deploys into `~/opt/<repo>/` and creates the links; its `uninstall.sh` removes both. Never make or delete one by hand. Same rule on every machine:
 

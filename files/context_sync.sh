@@ -39,17 +39,20 @@ m=${m%%.*}; [[ $m =~ ^[A-Za-z0-9-]+$ ]] || { echo "no machine name: macOS sudo s
 _limit() { perl -e 'alarm shift; exec @ARGV or exit 127' "$@"; }
 
 # The Drive folder -> $SNAP.new: through ~/gdrive, else through the Drive API (gws): macOS forbids ~/Library/CloudStorage
-# to a scheduled job's bash ("Operation not permitted", 2026-10-19).
+# to a scheduled job's bash ("Operation not permitted", 2026-10-19); the API lags behind ~/gdrive, so it only adds newer files.
 _copy_from_drive() {
     rm -rf "$SNAP.new"
     if _limit 30 test -s "$SRC/AGENTS_SHARED.md" \
         && _limit 300 rsync -rlt --prune-empty-dirs --exclude='.DS_Store' --exclude='*.gdoc' --exclude='*.gsheet' --exclude='*.gslides' \
                --exclude='.tmp*' --exclude='Icon?' --exclude='/from_repos' "$SRC/" "$SNAP.new/" 2>/dev/null; then
+        date +%s > "$CTX/last_full_copy"     # read by the API path below
         return 0
     fi
     rm -rf "$SNAP.new"
-    [ -z "${CONTEXT_SRC:-}" ] && [ -x "$CTX/context-drive" ] && _limit 300 "$CTX/context-drive" pull "$SNAP.new" >/dev/null \
-        && echo "~/gdrive not readable here: read through the Drive API"
+    # The API: only the files newer in the Drive, on top of the current copy (never older, never a deletion: context_drive.py).
+    [ -z "${CONTEXT_SRC:-}" ] && [ -x "$CTX/context-drive" ] && [ -d "$SNAP" ] && cp -Rp "$SNAP" "$SNAP.new" \
+        && _limit 300 "$CTX/context-drive" newer "$SNAP.new" "$(cat "$CTX/last_full_copy" 2>/dev/null || echo 0)" | tail -1 | sed 's/^/~\/gdrive not readable here, Drive API: /' \
+        && [ "${PIPESTATUS[0]}" = 0 ]
 }
 
 # --- 1. The Drive folder -> snapshot/ (a new copy, swapped in whole; files read-only)

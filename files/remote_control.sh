@@ -19,7 +19,10 @@ log "start $(claude --version 2>/dev/null | head -1)"
 
 # On launchctl bootout, pass the TERM on so claude closes its sessions cleanly.
 trap 'kill -TERM "$child" 2>/dev/null' TERM INT
-claude remote-control --permission-mode auto >/dev/null 2>>"$LOG" &
+# Claude in Chrome is off by default for spawned sessions, whatever the /chrome setting says:
+# turn it on where Chrome runs (the Mac), not on the VM.
+chrome=(); [ "$(uname -s)" = Darwin ] && chrome=(--chrome)
+claude remote-control --permission-mode auto "${chrome[@]}" >/dev/null 2>>"$LOG" &
 child=$!
 rc=0
 while kill -0 "$child" 2>/dev/null; do wait "$child"; rc=$?; done

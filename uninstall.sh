@@ -67,4 +67,12 @@ if [ "$(uname)" = Darwin ]; then
     done
     _remove_link "$HOME/.local/bin/cc-map" "$OPT_DIR/bin/cc-map"
     _remove_link "$HOME/.local/bin/cc-rc" "$OPT_DIR/bin/cc-rc"
+elif [ "$(uname)" = Linux ]; then
+    _rc_name="com.jeanlescut.my-setup.remote-control.service"
+    systemctl --user disable --now "$_rc_name" 2>/dev/null && installed "stopped $_rc_name"
+    _remove_link "$HOME/.config/systemd/user/$_rc_name" "$OPT_DIR/$_rc_name"
+    for f in "$OPT_DIR/$_rc_name" "$OPT_DIR/remote_control.sh"; do
+        [ -f "$f" ] && rm "$f" && installed "removed $f"
+    done
+    systemctl --user daemon-reload 2>/dev/null
 fi

@@ -98,10 +98,11 @@ Before the first browser action of a session, `select_browser` by deviceId (the 
 |---|---|---|
 | Claude - general | `331a94e7-f123-4e09-a755-cdc63980187f` | everything by default (not logged in to LinkedIn since 2026-10-19) |
 | Claude - auto-job-apply | `f16617c3-d0dc-425b-a7a4-d925eec10bf5` | only `~/dev/job-applications` (auto-job-apply, LinkedIn): logged in to LinkedIn, not to Google; never anything else (user, 2026-10-19) |
-| Personal | `7ffa990a-3bd4-46be-bf9e-871ec9870f9a` | only pages that need the user's Google login (Google One, Gmail web…) |
 | Claude - Facebook | `db5922d3-1713-4df0-a025-1ac608fac5f1` | only Facebook Marketplace for `~/dev/marketplace-seller` (logged in to the user's secondary Facebook account); never anything else, and nothing else ever uses Facebook |
 
 If a deviceId is missing from `list_connected_browsers`, ask the user; never pick another browser yourself.
+
+**The user's own profile is off-limits** (the user, 2026-10-20): Chrome's `Default` profile (jean.lescut@gmail.com, formerly "Personal", deviceId `7ffa990a…`) holds their password vault (Bitwarden). No agent ever selects it, launches it (`--profile-directory=Default`), or reads, copies or opens anything under `~/Library/Application Support/Google/Chrome/Default/`; Claude Code's deny rules block the file paths. A page that needs the user's Google login: the API first (skill `google-workspace`), otherwise ask the user. Agents' own secrets come only from the agents' Bitwarden account (collection "Agents"), never from the user's.
 
 Closing the job = closing the tabs: when your browser work is finished, close every tab of your tab group (`tabs_close_mcp`), even with an error or nothing found. Keep a tab open only while the user's help or input is needed in it, and say which tab. Paused or on hold is not finished: those tabs stay open.
 

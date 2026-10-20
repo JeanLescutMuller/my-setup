@@ -7,7 +7,7 @@ description: This machine's ownership map for ~/.claude/settings.json keys, and 
 
 No single tool owns this whole file — each owner manages specific keys and leaves the rest alone:
 
-- `respondToBashCommands`, `theme`, `statusLine`, `cleanupPeriodDays`, `claudeMdExcludes`, `autoMemoryEnabled`, `skillOverrides`, `pluginConfigs` — owned by `my-setup` (`modules/claude_config.sh`)
+- `respondToBashCommands`, `theme`, `statusLine`, `cleanupPeriodDays`, `claudeMdExcludes`, `autoMemoryEnabled`, `skillOverrides`, `pluginConfigs`, `permissions` — owned by `my-setup` (`modules/claude_config.sh`)
 - `hooks` — owned by `agent-session-manager`'s own `install.sh`
 - `env` → `CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_LOGS_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_ENDPOINT` only — owned by `agent-usage-tracker`'s own `install.sh` (`src/telemetry/merge_claude_env.py`); other `env` keys have no owner
 - `enabledPlugins`, `extraKnownMarketplaces` — owned by `notify`'s own `install.sh`

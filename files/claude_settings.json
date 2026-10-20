@@ -26,5 +26,14 @@
         "instructionFiles": "claude-md-and-agents-md"
       }
     }
+  },
+  "permissions": {
+    "deny": [
+      "Read(~/Library/Application Support/Google/Chrome/Default/**)",
+      "Edit(~/Library/Application Support/Google/Chrome/Default/**)",
+      "Bash(*Chrome/Default*)",
+      "Bash(*profile-directory=Default*)",
+      "Bash(*profile-directory Default*)"
+    ]
   }
 }

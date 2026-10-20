@@ -72,7 +72,9 @@ with open(settings_path, "w") as f:
 # the built-in claude-in-chrome; docs needs the Claude Docs MCP, off here; docx/pptx/xlsx: no Microsoft
 # Office on this machine; whatsapp-cli's own skill sends by bringing WhatsApp to the
 # front, our whatsapp skill replaces it).
-for key in respondToBashCommands theme statusLine cleanupPeriodDays autoMemoryEnabled skillOverrides pluginConfigs; do
+# permissions: deny rules that keep every agent out of the user's own Chrome profile (Default), which holds their
+# password vault (user, 2026-10-20); the agents' rule is in files/AGENTS_LOCAL.md "Chrome profiles".
+for key in respondToBashCommands theme statusLine cleanupPeriodDays autoMemoryEnabled skillOverrides pluginConfigs permissions; do
     _check_or_set_json "$key"
 done
 

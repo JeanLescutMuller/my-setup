@@ -25,7 +25,7 @@ since = time.time() - args.hours * 3600
 HOME = Path.home()
 CHROME_DIR = HOME / 'Library/Application Support/Google/Chrome'
 # Chrome's own Claude-in-Chrome profiles (CLAUDE.md "Chrome profiles"); other deviceIds show raw
-D_DEVICE = {'331a94e7': 'Claude - general', '7ffa990a': 'Personal', 'db5922d3': 'Claude - Facebook'}
+D_DEVICE = {'331a94e7': 'Claude - general', '7ffa990a': 'Default (the user\'s own: off-limits to agents)', 'db5922d3': 'Claude - Facebook'}
 RE_LAUNCH = re.compile(r'Google Chrome|--profile-directory')  # cheap pre-filter of transcript lines
 
 

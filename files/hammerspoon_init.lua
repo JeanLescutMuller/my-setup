@@ -1,7 +1,7 @@
 -- my-setup: files/hammerspoon_init.lua, deployed to ~/opt/my-setup/hammerspoon/init.lua by modules/hammerspoon.sh and
 -- linked from ~/.hammerspoon/init.lua. Edit it in ~/dev/my-setup, then `INSTALL=true bash bootstrap.sh hammerspoon`.
 --
--- 2-key shortcuts for the "Blocks" macro of the "Importants (new)" Sheet (data-organization, work/tools/sheet_blocks/;
+-- 2-key shortcuts for the "Blocks" macro of the "Importants (new)" Sheet (~/dev/secrets-and-account-migration, work/tools/sheet_blocks/;
 -- user, 2026-10-21): ⌥B new block, ⌥D remove the block, ⌥R redraw → the macro's own shortcuts ⌘⌥⇧1 / ⌘⌥⇧2 / ⌘⌥⇧3.
 -- Only while the front window is a Chrome window whose title has "Importants"; anywhere else the keys type what they
 -- always did.

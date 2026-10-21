@@ -99,7 +99,7 @@ Before the first browser action of a session, `select_browser` by deviceId (the 
 | Claude - general | `331a94e7-f123-4e09-a755-cdc63980187f` | everything by default (not logged in to LinkedIn since 2026-10-19) |
 | Claude - auto-job-apply | `f16617c3-d0dc-425b-a7a4-d925eec10bf5` | only `~/dev/job-applications` (auto-job-apply, LinkedIn): logged in to LinkedIn, not to Google; never anything else (user, 2026-10-19) |
 | Claude - Facebook | `db5922d3-1713-4df0-a025-1ac608fac5f1` | only Facebook Marketplace for `~/dev/marketplace-seller` (logged in to the user's secondary Facebook account); never anything else, and nothing else ever uses Facebook |
-| Claude - accounts | `7b1160ff-049d-46fd-9a76-1fdf37e6e35c` | only the migration of the user's website accounts (`~/dev/data-organization`, `work/accounts_migration/agent_design.md`): not signed in to Google, no password saving, no Bitwarden; **visible** (the user solves CAPTCHAs and pastes passwords); one site at a time, cookies cleared after each; never anything else (user, 2026-10-20) |
+| Claude - accounts | `7b1160ff-049d-46fd-9a76-1fdf37e6e35c` | only the migration of the user's website accounts (`~/dev/secrets-and-account-migration`, `work/accounts_migration/agent_design.md`): not signed in to Google, no password saving, no Bitwarden; **visible** (the user solves CAPTCHAs and pastes passwords); one site at a time, cookies cleared after each; never anything else (user, 2026-10-20) |
 
 If a deviceId is missing from `list_connected_browsers`, ask the user; never pick another browser yourself.
 

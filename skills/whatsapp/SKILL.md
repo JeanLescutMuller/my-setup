@@ -10,7 +10,7 @@ description: Any WhatsApp read or action on the user's own account - read chats 
 | Method | How | Limits |
 |---|---|---|
 | **A: `whatsapp-cli`** | Claude Code plugin `whatsapp-cli` (marcelrgberger), command `~/.local/bin/whatsapp-cli`. Reads WhatsApp Desktop's local database `~/Library/Group Containers/group.net.whatsapp.WhatsApp.shared/ChatStorage.sqlite`, read-only, no network. `--json` on any command. | Mac only, WhatsApp Desktop installed and synced. Its writes (`message send`, `send-file`, `ui …`) open WhatsApp, **bring it to the front** and press Return blind: never use them (below). **Hangs in Codex's sandbox** (👍 tested 2026-10-12: no output in 4 min). |
-| **H: Chrome + WhatsApp Web** | skill `claude-in-chrome`, **unavailable since 2026-10-20**: it used the user's own Chrome profile (deviceId `7ffa990a…`), now off-limits to agents (it holds their vault); it works again only once WhatsApp Web is linked in "Claude - general" (the user's choice). Was: the user's Chrome signed in to web.whatsapp.com ("Browser 2"; the LinkedIn profile `331a94e7…` is not signed in). Own tab, closed at the end. | Chrome running, Mac awake. Claude Code only. Never brought a window to the front (👍 iTerm stayed in front in 7 measured actions). Opening a chat probably marks it read: read with A. |
+| **H: Chrome + WhatsApp Web** | skill `claude-in-chrome`, Chrome profile **"Claude - general"** (deviceId `331a94e7-f123-4e09-a755-cdc63980187f`), signed in to web.whatsapp.com by the user on 2026-10-21: `select_browser` it by deviceId, never another profile. **Never the user's own profile** (`Default`, deviceId `7ffa990a…`): off-limits to every agent since 2026-10-20 (it holds their vault; AGENTS_LOCAL.md). Own tab, closed at the end. | Chrome running, Mac awake. Claude Code only. Never brought a window to the front (👍 iTerm stayed in front in 7 measured actions). Opening a chat probably marks it read: read with A. |
 | Not used | hidden browser (whatsapp-web.js), protocol copies (`wacli`, WhatsApp MCP servers, Baileys) | Would work with the Mac asleep and for Codex, but link a new device (4 max) and are easier for WhatsApp to detect; `wacli`-type clients have reported bans. Not tested; only on a spare number, with the user's OK. |
 | ❌ Business API | Meta's official API | Not for a personal number. |
 
@@ -27,7 +27,7 @@ description: Any WhatsApp read or action on the user's own account - read chats 
 | Contacts, groups, members, media list, export | `contact …`, `group …`, `message media`, `export …` | |
 | **Send a message** | ❌ `message send` (front, blind Return, prints "✓ sent" even when nothing was sent) | 👍 steps below |
 | Send to a group | ❌ (`message send` also turns a group id into a wrong phone number) | open the group from the list or search, then as below |
-| Send a photo / file | ❌ `send-file` (front) | 👍 Attach (`find` "Attach") → `find` the file input → `file_upload` (a file in the session scratchpad works) → preview → Send |
+| Send a photo / file | ❌ `send-file` (front) | 👍 Attach (`find` "Attach") → `find` the file input → `file_upload` (a file in the session scratchpad works) → preview → `find` "Send 1 selected". A small square PNG (a 1 KB QR code) went as a **sticker**, not a photo (2026-10-21); a JPEG should go as a photo (untested) |
 | React | ❌ | 👍 hover the message → `find` its "React" button → `find` the emoji → click. The reaction bar closes if you wait between two calls: open and pick in one go |
 | Reply | ❌ | 👍 hover → "Open message options" → Reply → type → Return |
 | Delete | ❌ | 👍 options → Delete → selection mode: check "1 selected" → Delete → **"Delete for me"** |
@@ -37,14 +37,14 @@ description: Any WhatsApp read or action on the user's own account - read chats 
 
 1. Read skill `writing-for-others` and draft the text. Show the user the recipient (name and number) and the exact text; wait for their OK. One OK covers one message.
 2. Own tab, then navigate to `https://web.whatsapp.com/send?phone=<digits, country code, no +>&text=<URL-encoded text>`. The page needs ~10 s: `find` "Send" until it is there.
-   A contact whose JID (from A) ends in `@lid`, e.g. `44126510776370@lid`, has no phone number in it: type the contact's name in the search box instead, open the chat from the results, then type the text (untested in H).
+   A contact whose JID (from A) ends in `@lid`, e.g. `44126510776370@lid`, has no phone number in it: click the search box (`find` reference), type the contact's name, open the chat from the results (`find` "search result chat named …"; check its last message is the one A shows), click the message box, type the text; a new line is `shift+Enter` (Return sends) (👍 2026-10-21).
 3. Zoom on the message box: the text is exactly the approved one. Click "Send" (`find` reference).
 4. **Check** in WhatsApp's own data before saying "sent":
    ```bash
    sqlite3 -readonly "file:$HOME/Library/Group Containers/group.net.whatsapp.WhatsApp.shared/ChatStorage.sqlite?mode=ro" \
      "SELECT ZTEXT, datetime(ZMESSAGEDATE+978307200,'unixepoch','localtime') FROM ZWAMESSAGE WHERE ZTEXT LIKE '<start of text>%' ORDER BY ZMESSAGEDATE DESC LIMIT 1;"
    ```
-   It shows within ~5 s (👍 2026-10-12, as long as WhatsApp Desktop is running).
+   It shows within ~5 s (👍 2026-10-12, as long as WhatsApp Desktop is running). With the app closed (only its `ServiceExtension` process runs) its data does not move: the check is then a screenshot of the open chat, the message there with its ticks (2026-10-21).
 5. Close the tab.
 
 Tests go to the user's own chat ("message yourself"). The user's number (not written here: this repo is public) is the one found in the most groups:

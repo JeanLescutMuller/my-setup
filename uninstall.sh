@@ -2,7 +2,7 @@
 # Removes what modules/agent_links.sh deploys: the skill links
 # in ~/.claude/skills and ~/.agents/skills
 # (only links that point into ~/opt/my-setup), then the read-only copies
-# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc.
+# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc; the Hammerspoon config link (modules/hammerspoon.sh).
 # Dotfiles, the shell rc block, git config and the tools are left alone.
 #
 # Usage: bash uninstall.sh
@@ -56,6 +56,13 @@ for dst in "$_ctx"/snapshot/skills/*/; do
     done
 done
 warn "kept $_ctx (the local copy and history.git): agents now start without the machine-wide rules"
+
+step "hammerspoon"
+if [ "$(uname)" = Darwin ]; then
+    _remove_link "$HOME/.hammerspoon/init.lua" "$OPT_DIR/hammerspoon/init.lua"
+    [ -f "$OPT_DIR/hammerspoon/init.lua" ] && rm "$OPT_DIR/hammerspoon/init.lua" && installed "removed $OPT_DIR/hammerspoon/init.lua"
+    warn "kept /Applications/Hammerspoon.app (brew uninstall --cask hammerspoon removes it)"
+fi
 
 step "remote control service"
 if [ "$(uname)" = Darwin ]; then

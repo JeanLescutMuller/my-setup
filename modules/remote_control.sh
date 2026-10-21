@@ -81,6 +81,8 @@ else
         printf '%s\n' "$_rc_body" > "$_rc_plist"
         ln -sfn "$_rc_plist" "$_rc_link"
         launchctl bootout "gui/$(id -u)/$_rc_label" 2>/dev/null || true
+        # bootout returns before claude has closed its sessions; bootstrap before then fails with EIO (5).
+        for _ in $(seq 30); do launchctl print "gui/$(id -u)/$_rc_label" >/dev/null 2>&1 || break; sleep 1; done
         if launchctl bootstrap "gui/$(id -u)" "$_rc_link"; then
             installed "LaunchAgent $_rc_label"
         else

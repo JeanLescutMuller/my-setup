@@ -1,6 +1,6 @@
 #!/bin/bash
 # Run by com.jeanlescut.my-setup.remote-control (macOS LaunchAgent / Linux systemd --user service, modules/remote_control.sh):
-# keeps `claude remote-control` running in ~/dev (or ~/opt where there is no ~/dev: the VM), so a session can be started
+# keeps `claude remote-control` running in ~/dev on the Mac, ~/opt on Linux (the VM), so a session can be started
 # from the phone (Claude app or claude.ai/code) at any time.
 # Writes ~/opt/my-setup/logs/remote-control.log: one line per start and exit, plus stderr.
 # Its screen (redrawn about once a second) goes to /dev/null: in the log it would add ~30 MB a day.
@@ -14,7 +14,9 @@ mkdir -p "${LOG%/*}"
 [ "$(wc -l < "$LOG" 2>/dev/null || echo 0)" -gt 2000 ] && tail -n 1000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
 log() { printf '%s\t%s\t%s\n' "$(date +%s)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >> "$LOG"; }
 
-cd "$HOME/dev" 2>/dev/null || cd "$HOME/opt" || { log "no ~/dev nor ~/opt"; exit 1; }
+# ~/dev on the Mac; ~/opt elsewhere (code is never edited off the Mac, even where an old ~/dev is left: the VM).
+dir="$HOME/opt"; [ "$(uname -s)" = Darwin ] && dir="$HOME/dev"
+cd "$dir" || { log "no $dir"; exit 1; }
 log "start $(claude --version 2>/dev/null | head -1)"
 
 # On launchctl bootout, pass the TERM on so claude closes its sessions cleanly.

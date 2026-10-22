@@ -74,7 +74,9 @@ with open(settings_path, "w") as f:
 # front, our whatsapp skill replaces it).
 # permissions: deny rules that keep every agent out of the user's own Chrome profile (Default), which holds their
 # password vault (user, 2026-10-20); the agents' rule is in files/AGENTS_LOCAL.md "Chrome profiles".
-for key in respondToBashCommands theme statusLine cleanupPeriodDays autoMemoryEnabled skillOverrides pluginConfigs permissions; do
+# remoteControlAtStartup: every interactive session turns on Remote Control (/rc) by itself, so it
+# shows in the Claude app (user, 2026-10-22).
+for key in respondToBashCommands theme statusLine cleanupPeriodDays autoMemoryEnabled skillOverrides pluginConfigs permissions remoteControlAtStartup; do
     _check_or_set_json "$key"
 done
 

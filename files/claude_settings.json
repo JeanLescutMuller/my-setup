@@ -35,5 +35,6 @@
       "Bash(*profile-directory=Default*)",
       "Bash(*profile-directory Default*)"
     ]
-  }
+  },
+  "remoteControlAtStartup": true
 }

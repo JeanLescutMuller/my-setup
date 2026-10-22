@@ -68,4 +68,4 @@ Examples: `~/dev/agent-quota-maximizer/design/04_start_windows/DESIGN.md` (heade
 | a rule an agent must follow when editing the code | `AGENTS.md`, as a one-line rule pointing at the design section |
 | the reason for a choice, the rejected alternatives | stays in `DESIGN.md` |
 | how the built thing actually works now | `doc/` beside the code |
-| an unanswered consideration | stays in `CONSIDERATIONS.md`, or becomes a task (skill `task-management`) when it is actionable |
+| an unanswered consideration | stays in `CONSIDERATIONS.md`, or becomes a task (skill `tasks`) when it is actionable |

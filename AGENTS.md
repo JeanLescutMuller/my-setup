@@ -19,7 +19,7 @@ request means this repository's `AGENTS.md` or the machine-wide rules in
 
 ## Deferred work
 
-Postponed improvements are Todoist tasks with `Repo: my-setup` (skill `task-management`); [`viewer.html`](viewer.html) shows them.
+Postponed improvements are Todoist tasks with `Repo: my-setup` (skill `tasks`); [`viewer.html`](viewer.html) shows them.
 
 ## Statusline and Codex patch builds
 

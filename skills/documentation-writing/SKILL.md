@@ -5,7 +5,7 @@ description: Personal documentation conventions for every project on this machin
 
 # Documentation writing
 
-This file holds only what every documentation task needs. Tasks, open work and to-do lists are not documentation: they belong to skill `task-management`, never to a file described here. **Read a reference file only when your task matches its row below** — the rest is not for you.
+This file holds only what every documentation task needs. Tasks, open work and to-do lists are not documentation: they belong to skill `tasks`, never to a file described here. **Read a reference file only when your task matches its row below** — the rest is not for you.
 
 ## Always: how to write
 

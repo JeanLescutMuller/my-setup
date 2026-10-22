@@ -8,6 +8,14 @@ The user has limited time, reads quickly, and does not read long prose. Make res
 
 - Keep answers short and lead with the result or next action.
 - When providing commands or code to execute, consolidate them into a single copy-pasteable code block whenever practical.
+- Proposing an HTML file to the user (user, 2026-10-22):
+
+  | The user is working from | Give them |
+  |---|---|
+  | the laptop | the file's **full path** (`/Users/jeanlescut/…/page.html`), never a relative one, so they can click it |
+  | the phone (Remote Control, the Claude app) | an **Artifact** (hosted on Anthropic's server) |
+
+  Not sure which: give both.
 
 ### Show, don't narrate
 

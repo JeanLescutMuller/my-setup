@@ -21,7 +21,7 @@ from pathlib import Path
 
 FOLDER = "application/vnd.google-apps.folder"
 COPIES = "from_repos"
-REPO_FILES = [("task-management", "skills/task-management/SKILL.md"),
+REPO_FILES = [("tasks", "skills/tasks/SKILL.md"),
               ("job-applications", "skills/application-writing/SKILL.md"),
               ("job-applications", "skills/application-writing/references/rules.md"),     # SKILL.md: "read it first"
               ("job-applications", "skills/application-writing/references/html-cv.md"),

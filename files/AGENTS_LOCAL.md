@@ -128,6 +128,7 @@ Reuse these instead of rebuilding them; read the named file before depending on 
 | `agent-usage-tracker` | quota %, tokens and $ for Claude and Codex, per machine | `FOR_READERS.md` |
 | `agent-session-manager` (`asm`) | session search, sync and resume across machines and agents | README |
 | `agent-notify` | terminal notifications for concurrent sessions | README |
+| `tasks` | every task in Todoist, and the phone when it matters: the `task` command (add, edit, complete, delete); never your own Todoist or notification code | skill `tasks`; `task --help` |
 
 # Editing this file
 

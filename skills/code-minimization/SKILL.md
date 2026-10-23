@@ -11,7 +11,7 @@ Proven on job-runner on 2026-10-10 (session `86413088…` in `~/.claude/projects
 |---|---|
 | **token** | a word or one symbol of code, as `count_cost.py` counts it |
 | **shared code** | written once: a library, a server, a dashboard |
-| **client code** | written or copied once per client: a job's entrypoint, the `viewer.html` in each project |
+| **client code** | written or copied once per client: a job's entrypoint, the `todo.html` in each project |
 | **cost** | 1 × the shared code's tokens + 2 × the client code's tokens |
 | **attempt** | one agent's try at a lower cost, in its own worktree |
 
@@ -38,7 +38,7 @@ These rules go in the brief **before** any agent starts (on 2026-10-10 the first
 | shared: `lib.sh` 3341, `dashboard.py` 3204, `install.sh` 1258, `ops.sh` 432… (8 files) | 9221 | ×1 | 9221 |
 | client: 10 entrypoints + their 9 `.conf` | 869 | ×2 | 1738 |
 | **total** | | | **10959** |
-| task-management (an example): `viewer.html` copied in 4 projects, 80 tokens each | 320 | ×2 | 640 |
+| task-management (an example): `todo.html` copied in 4 projects, 80 tokens each | 320 | ×2 | 640 |
 
 **What counts**, from `count_cost.py`'s header:
 

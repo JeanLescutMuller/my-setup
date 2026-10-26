@@ -52,6 +52,7 @@ The user has repeatedly been lost by invented terminology. Therefore:
 
 - Token counts also as a % of Claude's window (1,000,000) and Codex's (258,400), 2 decimals; an inventory puts "at init" and "on use" in separate columns.
 - Name every script, notebook or file by its full path, and say which data it reads and writes.
+- A local file or folder given to the user is always its full absolute path (`/Users/jeanlescut/...`), never `~/...`, a relative path or a bare filename: only a full path is clickable in the terminal (the user, 2026-10-26).
 - A command for the user to run: the remote part of `ssh host '…'` is always single-quoted, or the Mac's shell expands `~` and `$` first.
 
 ## Re-orienting after a gap

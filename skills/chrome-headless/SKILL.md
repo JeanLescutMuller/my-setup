@@ -34,7 +34,7 @@ The user, 2026-10-16: "every agent should keep track of which windows and tabs i
 
 | Step | Do |
 |---|---|
-| Before | `select_browser` by deviceId (CLAUDE.md table), then `tabs_context_mcp`; if the profile is **not connected**, ask the user to open that Chrome profile: **never open a window from the shell** (`open -a/-na "Google Chrome"`): Claude in Chrome cannot see or close it |
+| Before | `select_browser` by deviceId (CLAUDE.md table), then `tabs_context_mcp`; if the profile is **not connected**, ask the user to open that Chrome profile: **never open a window from the shell** (`open -a/-na "Google Chrome"`): Claude in Chrome cannot see or close it. One exception (user, 2026-10-26): when the user asks for it, an agent working in `~/dev/job-applications` opens and closes "Claude - auto-job-apply" itself with that repo's `.venv/bin/python -m common.chrome open` / `close`, which records the window and closes it (checked) |
 | Open | only with `tabs_create_mcp` (or `tabs_context_mcp createIfEmpty`, which opens a new window holding your tab group): every tab you open is in your group, and you note its id |
 | A tab you did not open | never close, reuse or navigate it, unless the user asked |
 | End of the work (done, failed or nothing found) | `tabs_close_mcp` on **every** tab id of your group; closing the last one removes the group and its window |

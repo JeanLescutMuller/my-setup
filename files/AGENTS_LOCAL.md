@@ -98,7 +98,7 @@ Get "this machine's name" (`chan-lescut-macbook-pro`, `H-Frank-1`, `GCP`) only w
 
 ## Chrome profiles (Claude in Chrome)
 
-**Headless by default** (the user, 2026-10-16): a visible Chrome window or tab only to show the user something; reading, testing, scraping and scheduled jobs run in a headless Chrome started by a script. Every agent tracks the tabs and windows it opens, closes them all at the end and checks they are closed (`tabs_context_mcp` shows no tab group); never a Chrome window opened from the shell (`open -a/-na`): if a profile is not connected, ask the user. How, and what was tested: skill `chrome-headless` (read it before any browser work).
+**Headless by default** (the user, 2026-10-16): a visible Chrome window or tab only to show the user something; reading, testing, scraping and scheduled jobs run in a headless Chrome started by a script. Every agent tracks the tabs and windows it opens, closes them all at the end and checks they are closed (`tabs_context_mcp` shows no tab group); never a Chrome window opened from the shell (`open -a/-na`): if a profile is not connected, ask the user. One exception (the user, 2026-10-26): when the user asks for it, an agent working in `~/dev/job-applications` opens and closes "Claude - auto-job-apply" itself, only through that repo's `common/chrome.py` (its AGENTS.md). How, and what was tested: skill `chrome-headless` (read it before any browser work).
 
 Before the first browser action of a session, `select_browser` by deviceId (the names in the extension are not kept: they show "Browser 1/2/3"):
 

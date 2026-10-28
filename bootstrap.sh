@@ -114,6 +114,7 @@ OWN_BINS=(
     "get_host_color.sh:get_host_color"
     "cc_map.py:cc-map"
     "cc_rc.py:cc-rc"
+    "gws_login.sh:gws-login"
 )
 
 _deploy_own_bin() {

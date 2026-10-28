@@ -10,7 +10,7 @@ One CLI for every Google service, already logged in on this Mac. Merged from the
 ## Auth and syntax
 
 ```bash
-gws auth login                                  # browser OAuth, once
+gws-login [jean.lescut|contact.lescut|jean.lescut.muller]   # log in (default jean.lescut): says which account to click, checks it after
 gws <service> <resource> <method> --params '{…}' --json '{…}' [--format json|table|yaml|csv] [--page-all] [--dry-run]
 gws <service> --help                            # services: gmail calendar drive docs sheets slides tasks people
 gws schema <service>.<resource>.<method>        # required params, types - read before a first call
@@ -22,6 +22,7 @@ gws gmail users messages list --params '{"userId": "me", "q": "from:x newer_than
 
 ## Rules
 
+- **Logging in: the user runs `! gws-login <account>`, never a bare `gws auth login`**, and your message names the account to choose on Google's page, in bold, e.g. "choose **jean.lescut@gmail.com**" (user, 2026-10-28: the page lists several accounts). The command prints it too, uses that account's config folder and scopes, then checks the account that really logged in.
 - **Confirm with the user before any write or delete**, and above all before sending an email or a calendar invite; try it with `--dry-run` first.
 - Never print tokens or keys.
 - Mutations for one user must be sent **one at a time** (parallel calls fail or slow down).

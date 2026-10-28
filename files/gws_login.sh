@@ -35,13 +35,17 @@ cat <<EOF
   └─────────────────────────────────────────────────────────────┘
 
 EOF
+# a token cache kept from the last login made Drive answer 401 while Gmail worked (2026-10-28): start without it
+rm -f "$dir/token_cache.json"
 GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$dir" gws auth login --scopes "${scopes%,}"
 
 got=$(GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$dir" gws gmail users getProfile --params '{"userId":"me"}' 2>/dev/null \
     | python3 -c 'import json,sys; print(json.load(sys.stdin).get("emailAddress",""))' 2>/dev/null || true)
-if [ "$got" = "$email" ]; then
-    echo "OK: gws is logged in as $email"
+drive=$(GOOGLE_WORKSPACE_CLI_CONFIG_DIR="$dir" gws drive about get --params '{"fields":"user(emailAddress)"}' 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["user"]["emailAddress"])' 2>/dev/null || true)
+if [ "$got" = "$email" ] && [ "$drive" = "$email" ]; then
+    echo "OK: gws is logged in as $email (Gmail and Drive checked)"
 else
-    echo "WRONG ACCOUNT or login failed: expected $email, got '${got:-nothing}'. Run gws-login $account again and choose $email." >&2
+    echo "WRONG ACCOUNT or login failed: expected $email, Gmail says '${got:-nothing}', Drive says '${drive:-nothing}'. Run gws-login $account again and choose $email." >&2
     exit 1
 fi

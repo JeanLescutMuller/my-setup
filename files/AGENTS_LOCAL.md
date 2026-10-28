@@ -1,6 +1,6 @@
 # General conventions (MacBook + Debian VM)
 
-<!-- The rules for Claude Code and Codex. The web AIs get only a short form of "Answering the user", in init/settings_note.md: change both together. -->
+<!-- The rules for Claude Code and Codex. The web AIs get only a short form of "Answering the user", in doc/my-context/settings_note.md: change both together. -->
 
 ## Answering the user (interactive sessions)
 
@@ -139,7 +139,7 @@ Reuse these instead of rebuilding them; read the named file before depending on 
 | this file (up to the `---` line) | `~/dev/my-setup/files/AGENTS_LOCAL.md` | commit, then `INSTALL=true bash ~/dev/my-setup/bootstrap.sh my_context` |
 | `AGENTS_SHARED.md` (below it) | the Drive `~/gdrive/Personal/my-context/AGENTS_SHARED.md` | `context-sync -m "…" --agent "…"` |
 
-A change to "Answering the user" also goes into the short form in `~/gdrive/Personal/my-context/settings_note.md`, and the user re-pastes it into the web AIs.
+A change to "Answering the user" also goes into the short form in `~/dev/my-setup/doc/my-context/settings_note.md`, and the user re-pastes it into the web AIs.
 
 # Token-conscious execution
 

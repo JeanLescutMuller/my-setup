@@ -1,6 +1,6 @@
 #!/bin/bash
 # my-context: the Drive folder Personal/my-context/ (the only source of the user's facts, shared rules and life skills,
-# since 2026-10-19; why: its design/DESIGN.md), made loadable by every agent even offline, with its history:
+# since 2026-10-19; why: doc/my-context/DESIGN.md), made loadable by every agent even offline, with its history:
 #   files/AGENTS_LOCAL.md        -> ~/opt/my-setup/context/AGENTS_LOCAL.md (read-only)
 #   files/context_sync.sh        -> ~/opt/my-setup/context/context-sync     <- ~/.local/bin/context-sync
 #   files/context_history.sh     -> ~/opt/my-setup/context/context-history  <- ~/.local/bin/context-history

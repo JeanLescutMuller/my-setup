@@ -69,7 +69,7 @@ with headless(Path.home() / 'opt/<repo>/chrome', purpose='…', url='https://exa
 | `data_dir`, `purpose` | required |
 | `url`, `keep=False`, `needs_human=None`, `flags=()` | optional. `keep=True`: leave Chrome and the tab for the next run of the same job or project. `flags`: extra Chrome options (`'--disk-cache-size=…'`) |
 
-Inside a Claude session, `headless()` first requires `agent-chrome authorize-tab "<why>" --visibility invisible --visibility-reason "…"`. A killed caller never leaves Chrome running (a watcher quits it and records the close, unless `keep=True`); a data folder a visible Chrome already uses is refused. CLI for tests: `launch_headless.py --data-dir D --purpose P --url U [--keep] | --close`. Logging a tool's Chrome in once: open the same data folder **without** headless at the site's login page, the user logs in and quits with cmd+Q; from then on a login form on the page = logged out: ask the user again, never type a password.
+Inside a Claude session, `headless()` first requires `agent-chrome authorize-tab "<why>" --visibility invisible --visibility-reason "…"`. A killed caller never leaves Chrome running (a watcher quits it and records the close, unless `keep=True`); a data folder a visible Chrome already uses is refused. CLI for tests: `launch_headless.py --data-dir D --purpose P --url U [--keep] | --close`. LinkedIn headless (job-applications): `tools/chrome_login.sh` once (the user logs in), then `tools/check_linkedin_headless.py` says logged in / logged out / blocked (bot check). Logging a tool's Chrome in once: open the same data folder **without** headless at the site's login page, the user logs in and quits with cmd+Q; from then on a login form on the page = logged out: ask the user again, never type a password.
 
 ### 4. If visible: which window? (the user's comfort)
 
@@ -87,6 +87,7 @@ Never in front of the user. Claude in Chrome actions (create a tab, navigate, cl
 |---|---|
 | the user must act (log in, captcha, upload, check before sending): right after opening the tab, or later | `agent-chrome mark-as-needing-human "<exact steps, full file paths>"`: red bar "NEEDS HUMAN: …" on the tab, badge "!"; say in chat which tab and what to do |
 | their part is over | `agent-chrome mark-as-human-done` |
+| nobody acts within 2 h after `mark-as-needing-human` | the kit closes the tab, the record says "expired", your next hook call tells you: tell the user; reopen only if they ask |
 | the hook adds "Message from the user" | the user typed it in the tab's side panel: act on it as their request, answer with `agent-chrome reply-to-human "<text>"` (shown on the tab) |
 | end of the work (done, failed or nothing found) | `tabs_close_mcp` on every tab of your group; check with `tabs_context_mcp` (no `createIfEmpty`) that no group is left; say "tabs closed (checked)". The hook reminds you once at the end of a turn that leaves a tab open with no human needed |
 | keeping a tab | only while a human is needed in it (marked with `mark-as-needing-human`) |

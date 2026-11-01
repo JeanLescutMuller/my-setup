@@ -37,6 +37,7 @@ The user, 2026-10-16: "every agent should keep track of which windows and tabs i
 | Before | `select_browser` by deviceId (CLAUDE.md table), then `tabs_context_mcp`; if the profile is **not connected**, ask the user to open that Chrome profile: **never open a window from the shell** (`open -a/-na "Google Chrome"`, the hook refuses it): Claude in Chrome cannot see or close it. One exception (user, 2026-10-26): when the user asks for it, an agent working in `~/dev/job-applications` opens and closes "Claude - LinkedIn" itself with that repo's `.venv/bin/python -m common.chrome open` / `close`, which records the window and closes it (checked) |
 | What is open already | `chrome-claim open` (`--json`): the tabs open for your project, by any session or job, with who, when and why. Reuse yours; another session's tab cannot be driven by you (Claude in Chrome shows each session only its own group): if nobody waits on it (`needs_human` empty), close it before opening yours; if someone does, leave it and tell the user |
 | Say why | `chrome-claim --purpose "…"` plus `--needs-human "what the user must do"` (captcha, login, upload…) or `--visible-because "why headless can't do it"` (a logged-in profile…). The hook refuses to open a page without it. Shown on the tab by the extension "Agent tab notes" |
+| One profile per session | your first `select_browser` fixes the session's profile; another one is refused: LinkedIn and a general site need two sessions |
 | Open | only with `tabs_create_mcp` (or `tabs_context_mcp createIfEmpty`, which opens a new window holding your tab group): **one tab per session**, the hook refuses a second ("reuse tab N"); note its id |
 | The user's part | `chrome-claim --needs-human "…"` when it starts (red bar on the tab), `chrome-claim done` when it is over |
 | A "Message from the user" from the hook | typed in the tab's comment box: act on it, answer with `chrome-claim --message "…"` (shown on the tab) |
@@ -68,7 +69,7 @@ with headless(Path.home() / 'opt/<repo>/chrome', purpose='…', url='https://exa
 # keep=True: leave Chrome and the tab for the next run (needs_human='…' if the user must act in it)
 ```
 
-A temporary data folder (`tempfile.mkdtemp()`) for public pages; the tool's own `~/opt/<repo>/chrome/` for a site that needs a login. Flags it uses (tested below): `--headless`, `--disable-blink-features=AutomationControlled`, a normal user agent. CLI for tests: `launch_headless.py --data-dir D --purpose P --url U [--keep] | --close`.
+A temporary data folder (`tempfile.mkdtemp()`) for public pages; the tool's own `~/opt/<repo>/chrome/` for a site that needs a login. Flags it uses (tested below): `--headless`, `--disable-blink-features=AutomationControlled`, a normal user agent. Extra Chrome options: `flags=('--disk-cache-size=…',)`. A killed caller never leaves Chrome running: a watcher quits it and records the close (unless `keep=True`). A data folder a visible Chrome already uses is refused. CLI for tests: `launch_headless.py --data-dir D --purpose P --url U [--keep] | --close`.
 
 Logging a tool's Chrome in once: open the same data folder **without** `--headless` and with the site's login page, tell the user to log in and quit it with cmd+Q; check from then on with a headless run (a login form on the page = logged out: ask the user again, never type a password).
 

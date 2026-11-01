@@ -272,6 +272,20 @@ r = cli('agent_chrome.py', 'open-profile-window')
 check('window: the profile already has a window -> nothing opened', r.returncode == 0 and 'already has' in r.stdout
       and not (tmp / 'state/fake-args').exists())
 keep.kill()
+keep.wait()
+ls_saved = (tmp / 'Local State').read_text()
+d_ls = json.loads(ls_saved)
+d_ls['profile']['last_active_profiles'] = ['Default', 'Profile 3']
+(tmp / 'Local State').write_text(json.dumps(d_ls))
+r = cli('agent_chrome.py', 'open-profile-window')
+check('window: no live report, but Chrome\'s Local State lists the profile as open -> nothing opened, says why',
+      r.returncode == 0 and 'Local State' in r.stdout and not (tmp / 'state/fake-args').exists(), r.stdout)
+d_ls['profile']['last_active_profiles'] = ['Default']
+(tmp / 'Local State').write_text(json.dumps(d_ls))
+r = cli('agent_chrome.py', 'open-profile-window')
+check('window: no live report, Local State says no window -> opened', r.returncode == 0 and (tmp / 'state/fake-args').exists(), r.stdout)
+(tmp / 'state/fake-args').unlink(missing_ok=True)
+(tmp / 'Local State').write_text(ls_saved)
 ENV['CLAUDE_CODE_SESSION_ID'] = 'sess-L'
 (tmp / 'state/sessions/sess-L.json').write_text(json.dumps({'profile': 'Claude - LinkedIn'}))
 r = cli('agent_chrome.py', 'open-profile-window')
@@ -336,6 +350,51 @@ check('a refusal carries the notice too (never lost)', decision(d) == 'deny' and
 (tmp / f'state/sessions/sess-E.notices.jsonl').write_text(json.dumps({'tab_id': 9, 'url': 'u', 'needs_human': 'x', 'after_s': 7200, 'dt': '2026-11-01T10:00:00Z'}) + '\n')
 d = hook('Stop', session_id='sess-E', stop_hook_active=False)
 check('at Stop: blocked with the notice, so the agent tells the user', d.get('decision') == 'block' and "didn't act in 2 h" in d.get('reason', ''), d)
+# The bar after "done" then a reply or a navigation: still "✓ done" (the host sends event "done"), until a new need
+TD = 778
+
+
+def host_notes() -> dict:
+    hp = subprocess.Popen([sys.executable, '-IB', str(KIT / 'native_host.py')], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=ENV)
+    hp.stdin.write(frame({'hello': 1}))
+    hp.stdin.flush()
+    m = json.loads(hp.stdout.read(struct.unpack('<I', hp.stdout.read(4))[0]))
+    hp.kill()
+    return m.get('notes', {})
+
+
+cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'a login', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-D')
+hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'ok'}], session_id='sess-D')
+hook('PostToolUse', C + 'tabs_create_mcp', {}, tabs((TD, 'New tab', '')), session_id='sess-D')
+cli('agent_chrome.py', 'mark-as-needing-human', 'log in', CLAUDE_CODE_SESSION_ID='sess-D')
+cli('agent_chrome.py', 'mark-as-human-done', CLAUDE_CODE_SESSION_ID='sess-D')
+cli('agent_chrome.py', 'reply-to-human', 'thanks', CLAUDE_CODE_SESSION_ID='sess-D')
+hook('PostToolUse', C + 'navigate', {'tabId': TD}, tabs((TD, 'x', 'https://x.ch/next')), session_id='sess-D')
+nd = host_notes().get(str(TD), {})
+check('host: done, then a reply and a navigation -> the note still says done (bar "✓ done"), the reply in the thread',
+      nd.get('event') == 'done' and not nd.get('needs_human') and [m['text'] for m in nd.get('thread', [])] == ['thanks'], nd)
+cli('agent_chrome.py', 'mark-as-needing-human', 'upload the file', CLAUDE_CODE_SESSION_ID='sess-D')
+nd = host_notes().get(str(TD), {})
+check('host: a new need after done -> NEEDS HUMAN again, not done', nd.get('event') != 'done' and nd.get('needs_human') == 'upload the file', nd)
+# Started by Chrome (argv[1] = the extension's origin), the host ignores the kit's overrides it inherits from Chrome
+# (a Chrome a test started carries the test's CHROME_STATE), unless a test's wrapper sets CHROME_KIT_TEST=1.
+fh = tmp / 'fakehome'
+(fh / 'opt/my-setup/state/chrome').mkdir(parents=True, exist_ok=True)
+(fh / 'opt/my-setup/state/chrome/open.json').write_text(json.dumps({'4242': {'opened_ts': int(time.time()), 'device_id': GEN, 'tab_id': 4242}}))
+
+
+def host_notes_as_chrome(**kw) -> dict:
+    hp = subprocess.Popen([sys.executable, '-IB', str(KIT / 'native_host.py'), 'chrome-extension://abc/'], stdin=subprocess.PIPE,
+                          stdout=subprocess.PIPE, env={**ENV, 'HOME': str(fh), **kw})
+    hp.stdin.write(frame({'hello': 1}))
+    hp.stdin.flush()
+    m = json.loads(hp.stdout.read(struct.unpack('<I', hp.stdout.read(4))[0]))
+    hp.kill()
+    return m.get('notes', {})
+
+
+check('host started by Chrome: an inherited CHROME_STATE is ignored (the real record is read)', list(host_notes_as_chrome()) == ['4242'])
+check('host started by a test wrapper (CHROME_KIT_TEST=1): CHROME_STATE is used', '4242' not in host_notes_as_chrome(CHROME_KIT_TEST='1'))
 check('hook never failed (no hook-errors.log)', not (tmp / 'state/hook-errors.log').exists())
 print(f'{n_pass} passed, {n_fail} failed; state: {tmp / "state"}')
 sys.exit(bool(n_fail))

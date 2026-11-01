@@ -223,7 +223,7 @@ def main():
     shutil.rmtree(profile, ignore_errors=True)
     (profile / 'NativeMessagingHosts').mkdir(parents=True)
     host_sh = SCRATCH / 'host.sh'               # what modules/chrome_kit.sh's manifest points to, with the test's record
-    host_sh.write_text(f"#!/bin/sh\nCHROME_STATE='{STATE}' CHROME_TEST_PS='{PS}' exec /usr/bin/python3 '{KIT / 'native_host.py'}' \"$@\"\n")
+    host_sh.write_text(f"#!/bin/sh\nCHROME_KIT_TEST=1 CHROME_STATE='{STATE}' CHROME_TEST_PS='{PS}' exec /usr/bin/python3 '{KIT / 'native_host.py'}' \"$@\"\n")
     host_sh.chmod(0o755)
     (profile / 'NativeMessagingHosts' / f'{HOST}.json').write_text(json.dumps(
         {'name': HOST, 'description': 'test', 'path': str(host_sh), 'type': 'stdio', 'allowed_origins': [f'chrome-extension://{EXT_ID}/']}))

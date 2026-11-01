@@ -9,7 +9,8 @@ their replies), comments.jsonl (the user's comments). Writes one line to comment
 side panel: ts, dt, session_id, tab_id, url, text (hook.py gives it to the session). Writes windows/<profile>.json
 while the extension runs: ts, dt, pid, profile, windows (ids), projects ({project: its agent window}); removed when
 the extension goes (agent-chrome open-profile-window reads it: does this profile have a window?).
-Sends the extension {"notes": {tab_id: entry + "thread"}} at start and after every change of those files: only
+Sends the extension {"notes": {tab_id: entry + "thread"}}, event "done" when the session's last need event since the
+tab opened is "done" (so the bar keeps "✓ done" after a reply or a navigation), at start and after every change of those files: only
 Claude in Chrome tabs (device_id set) opened since the user's Chrome started (Chrome reuses tab ids after a restart).
 Expiry (the deadline of a tab kept for a human, expires_ts in open.json; chrome_kit.NEEDS_HUMAN_TTL): once past it,
 sends {"expire": [tab_id]}; the extension that holds the tab closes it and answers {"expired": {tab_id, url}}; this
@@ -29,6 +30,12 @@ import time
 from pathlib import Path
 
 sys.dont_write_bytecode = True  # no __pycache__ next to the deployed copy
+# Started by Chrome (argv[1] = the extension's origin), the host inherits Chrome's environment: a Chrome that a test
+# started carries the test's CHROME_STATE (1 Nov 2026: the bar never showed, the host wrote to a test folder). So the
+# kit's overrides count only from a test's own host wrapper, which sets CHROME_KIT_TEST=1 (tests/test_extension.py).
+if sys.argv[1:2] and sys.argv[1].startswith('chrome-extension://') and not os.environ.get('CHROME_KIT_TEST'):
+    for k in ('CHROME_STATE', 'CHROME_TEST_PS', 'CHROME_LOCAL_STATE', 'CHROME_NEEDS_HUMAN_TTL', 'CHROME_WINDOW_CMD'):
+        os.environ.pop(k, None)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chrome_kit as kit  # noqa: E402
 
@@ -79,10 +86,15 @@ def notes() -> dict:
         by_sid.setdefault(e.get('session_id'), []).append(e)
     for f in history_files():
         for r in jsonl(f):
-            if r.get('event') == 'message' and r.get('message'):
+            ev = r.get('event')
+            if ev in ('message', 'needs_human', 'done'):
                 for e in by_sid.get(r.get('session_id'), []):
-                    if r.get('ts', 0) >= e.get('opened_ts', 0):
+                    if r.get('ts', 0) < e.get('opened_ts', 0):
+                        continue
+                    if ev == 'message' and r.get('message'):
                         e['thread'].append({'ts': r['ts'], 'from': 'agent', 'text': r['message']})
+                    elif ev != 'message':   # the human's part: the last need event decides (a reply or a navigation after "done" keeps it)
+                        e['human_done'] = ev == 'done'
     for c in jsonl(kit.COMMENTS):
         e = d_notes.get(str(c.get('tab_id')))
         l_e = [e] if e else by_sid.get(c.get('session_id'), []) if c.get('session_id') else []
@@ -91,6 +103,8 @@ def notes() -> dict:
                 e['thread'].append({'ts': c.get('ts'), 'from': 'you', 'text': c.get('text')})
     for e in d_notes.values():
         e['thread'].sort(key=lambda m: m['ts'] or 0)
+        if e.pop('human_done', False) and not e.get('needs_human'):
+            e['event'] = 'done'   # what the bar and badge read (extension 1.4.0 tests event == "done"): no reload needed
     return d_notes
 
 

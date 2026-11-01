@@ -122,7 +122,11 @@ def frontmost() -> str:
 
 
 def front_window() -> str:
-    r = subprocess.run(['osascript', '-e', 'tell application "Google Chrome" to get id of window 1'], capture_output=True, text=True)
+    # Guarded: a bare `tell application "Google Chrome"` STARTS Chrome when it is not running, with this process's
+    # environment (1 Nov 2026: a test run started the user's Chrome with the test's CHROME_STATE; every native host
+    # Chrome then started wrote to the test's folder, and the bar never showed).
+    r = subprocess.run(['osascript', '-e', 'if application "Google Chrome" is running then tell application "Google Chrome" to get id of window 1'],
+                       capture_output=True, text=True)
     return r.stdout.strip()
 
 
@@ -148,6 +152,11 @@ def open_profile_window(project: str, sid: str | None, cwd: str, ctx: dict):
     if l_win:
         print(f'{me}: "{profile}" already has window(s) {l_win}: nothing opened. If Claude in Chrome is still not '
               'connected, ask the human to check the Claude extension in that window.')
+        return
+    if l_win is None and kit.profile_active(profile):   # no report from its extension, but Chrome says it has a window
+        print(f'{me}: "{profile}" ({folder}) already has a window (Chrome\'s Local State, last_active_profiles), but its '
+              '"Agent tab notes" extension does not report it: nothing opened. Ask the human to check, in that window, '
+              'chrome://extensions: "Agent tab notes" enabled, no "Errors" button (else Reload), and the Claude extension.')
         return
     url = f'chrome-extension://{EXT_ID}/window.html?' + urllib.parse.urlencode({'project': project, 'profile': profile})
     # The binary hands --profile-directory to the running Chrome (one more window); `open -g -a` would drop the

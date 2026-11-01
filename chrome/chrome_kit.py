@@ -241,6 +241,23 @@ def profile_windows(profile: str) -> list | None:
     return d.get('windows', []) if d and alive(d.get('pid')) else None
 
 
+def profile_active(profile: str) -> bool | None:
+    """Does Chrome say this profile has a window? Chrome's Local State "profile.last_active_profiles": the profile
+    folders with a window, kept by Chrome while it runs (a folder leaves when its last window closes; written ~10 s
+    after a change). None when it cannot tell: no such list, or Local State not written since the user's Chrome
+    started (a stale list from before a crash). The fallback when no extension reports (profile_windows)."""
+    folder = profile_folders().get(profile)
+    l_main = [p['start_ts'] for p in chrome_processes() if p['kind'] == "user's Chrome"]
+    d = read_json(LOCAL_STATE).get('profile', {})
+    try:
+        fresh = bool(l_main) and LOCAL_STATE.stat().st_mtime >= min(l_main) - 5
+    except FileNotFoundError:
+        fresh = False
+    if not folder or not fresh or 'last_active_profiles' not in d:
+        return None
+    return folder in d['last_active_profiles']
+
+
 def chrome_processes() -> list[dict]:
     """Every Chrome main process: pid, start ts, kind (the user's Chrome, visible with its own data folder, headless)."""
     l = []

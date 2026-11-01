@@ -1,0 +1,162 @@
+<title>agent-chrome Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one matrix. Columns = subcommands, rows = options; the first column explains the option and stays put while the table scrolls sideways. */
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --ink:#1b1f2e; --muted:#5d6479; --line:#dfe3ee;
+  --req:#d03a4a; --req-bg:#fde8ea;
+  --one:#c27c0e; --one-bg:#fff4dc;
+  --acc:#2563eb; --acc-bg:#e7efff;
+  --no:#a3a9ba;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11131c; --panel:#1a1d29; --ink:#e8eaf3; --muted:#9aa1b8; --line:#2c3142;
+  --req:#ff7d8a; --req-bg:#41191f; --one:#f0b44c; --one-bg:#3a2c12; --acc:#7aa7ff; --acc-bg:#1b2747; --no:#5b6276; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11131c; --panel:#1a1d29; --ink:#e8eaf3; --muted:#9aa1b8; --line:#2c3142;
+  --req:#ff7d8a; --req-bg:#41191f; --one:#f0b44c; --one-bg:#3a2c12; --acc:#7aa7ff; --acc-bg:#1b2747; --no:#5b6276; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1320px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(26px,4vw,40px);letter-spacing:-.02em;margin:0;text-wrap:balance}
+h1 code{font-family:var(--mono);font-weight:600;font-size:.82em;letter-spacing:0}
+p{margin:0;max-width:75ch}
+.muted{color:var(--muted)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+code,.mono{font-family:var(--mono);font-size:.88em}
+.legend{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.c{display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:6px;white-space:nowrap}
+.c.req{background:var(--req);color:#fff}
+.c.one{background:var(--one-bg);color:var(--one);border:1.5px solid var(--one)}
+.c.acc{background:var(--acc-bg);color:var(--acc);border:1.5px solid var(--acc)}
+.c.no{color:var(--no);border:1.5px dashed var(--line)}
+.box{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:separate;border-spacing:0;min-width:1180px;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:12px 12px;vertical-align:top;text-align:center}
+tbody tr:last-child td,tbody tr:last-child th{border-bottom:0}
+thead th{background:var(--panel);text-align:left;vertical-align:bottom}
+thead th .sub{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);display:block;word-break:break-word}
+thead th .what{font-size:12.5px;color:var(--muted);font-weight:400;display:block;margin-top:4px}
+thead th .when{font-size:12px;color:var(--ink);font-weight:400;display:block;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line)}
+thead th .when b{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;display:block}
+th.opt,td.opt{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left;width:300px;min-width:260px;border-right:1px solid var(--line)}
+td.opt .name{font-family:var(--mono);font-weight:600;font-size:13px;display:block}
+td.opt .ex{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin:2px 0 4px}
+td.opt .why{font-size:13px;color:var(--muted);display:block}
+tr.group th{background:var(--bg);text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px 12px;position:sticky;left:0}
+td .note{display:block;font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.35}
+.notes{display:grid;gap:8px;font-size:14px}
+.notes li{margin-left:2px}
+footer{font-size:12.5px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="eyebrow">Chrome kit · my-setup · draft 1 Nov 2026</div>
+    <h1>Options of <code>agent-chrome</code></h1>
+    <p class="muted">One column per subcommand, one row per option. Each cell says whether that subcommand refuses, accepts or requires the option. This is the planned interface: being built now, to be checked against <code>agent-chrome --help</code> once it is installed.</p>
+    <div class="legend">
+      <span class="c req">required</span>
+      <span class="c one">one of the two required</span>
+      <span class="c acc">optional</span>
+      <span class="c no">not accepted</span>
+    </div>
+  </header>
+
+  <div class="box">
+  <table>
+    <thead>
+      <tr>
+        <th class="opt"><span class="eyebrow">Option</span></th>
+        <th><span class="sub">authorize-tab</span><span class="what">Gets permission for this session to open its tab; records why.</span><span class="when"><b>When</b>Once per session, before its first page.</span></th>
+        <th><span class="sub">mark-as-needing-human</span><span class="what">Red "NEEDS HUMAN: …" bar and "!" badge on the session's tabs.</span><span class="when"><b>When</b>The user must act: log in, captcha, upload, check.</span></th>
+        <th><span class="sub">mark-as-human-done</span><span class="what">Clears "needs human": "✓ done, you may close".</span><span class="when"><b>When</b>The user's part is over.</span></th>
+        <th><span class="sub">reply-to-human</span><span class="what">The agent's answer, shown in the tab's side panel and bar.</span><span class="when"><b>When</b>The hook passed on a "Message from the user".</span></th>
+        <th><span class="sub">status</span><span class="what">Reads only: open agent tabs, running Chromes, history.</span><span class="when"><b>When</b>Before opening anything (<span class="mono">--mine</span>); "who opened what?"; leftovers.</span></th>
+        <th><span class="sub">open-profile-window</span><span class="what">Opens the project's profile window in the background, gives focus back.</span><span class="when"><b>When</b>Its profile is not connected.</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="group"><th colspan="7">The text after the subcommand</th></tr>
+      <tr>
+        <td class="opt"><span class="name">"&lt;why&gt;"</span><span class="ex">"Apply to Data Engineer at Exasoft"</span><span class="why">Why this session uses Chrome, in words the user understands. Shown on the bar of every tab of the session.</span></td>
+        <td><span class="c req">required</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+      </tr>
+      <tr>
+        <td class="opt"><span class="name">"&lt;what the human must do&gt;"</span><span class="ex">"Upload /Users/…/CV.pdf, then press Submit"</span><span class="why">The exact steps, with full file paths. Shown in red on the bar.</span></td>
+        <td><span class="c no">—</span></td>
+        <td><span class="c req">required</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+      </tr>
+      <tr>
+        <td class="opt"><span class="name">"&lt;text&gt;"</span><span class="ex">"Thanks, I see the captcha is solved, continuing"</span><span class="why">The agent's answer to what the user wrote in the side panel.</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+        <td><span class="c req">required</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+      </tr>
+
+      <tr class="group"><th colspan="7">Why the tab is visible (a Claude in Chrome tab is always visible)</th></tr>
+      <tr>
+        <td class="opt"><span class="name">--needs-human "…"</span><span class="ex">--needs-human "Log in to Temu"</span><span class="why">A human must act in the tab right from the start. Same effect as running mark-as-needing-human afterwards.</span></td>
+        <td><span class="c one">one of 2 required</span><span class="note">for a Claude in Chrome tab; scripts use the launcher instead</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+      </tr>
+      <tr>
+        <td class="opt"><span class="name">--visible-because "…"</span><span class="ex">--visible-because "LinkedIn needs the logged-in profile"</span><span class="why">No human action needed, but a headless Chrome can't do it (usually: only the visible profile is logged in).</span></td>
+        <td><span class="c one">one of 2 required</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+      </tr>
+
+      <tr class="group"><th colspan="7">Which session, which project</th></tr>
+      <tr>
+        <td class="opt"><span class="name">--session ID</span><span class="ex">--session 3f2a9c1e-77b0-…</span><span class="why">The Claude session this is about. Default: <span class="mono">$CLAUDE_CODE_SESSION_ID</span>, which every Claude Code shell has, so agents rarely need it.</span></td>
+        <td><span class="c acc">optional</span></td>
+        <td><span class="c acc">optional</span></td>
+        <td><span class="c acc">optional</span></td>
+        <td><span class="c acc">optional</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+      </tr>
+      <tr>
+        <td class="opt"><span class="name">--project P</span><span class="ex">--project job-applications</span><span class="why">Another project than the current folder's (the project = the name of the folder's git repo).</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+        <td><span class="c acc">optional</span><span class="note">only this project's tabs</span></td>
+        <td><span class="c acc">optional</span><span class="note">that project's profile window</span></td>
+      </tr>
+      <tr>
+        <td class="opt"><span class="name">--mine</span><span class="ex">status --mine</span><span class="why">Only the current folder's project: what an agent checks before opening a tab, to reuse or close instead of duplicating.</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+        <td><span class="c acc">optional</span></td>
+        <td><span class="c no">—</span></td>
+      </tr>
+
+      <tr class="group"><th colspan="7">Reading</th></tr>
+      <tr>
+        <td class="opt"><span class="name">--since 7d</span><span class="ex">--since 30m · 12h · 7d</span><span class="why">Adds the history over that period: what was opened and closed, by whom, why.</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+        <td><span class="c acc">optional</span></td>
+        <td><span class="c no">—</span></td>
+      </tr>
+      <tr>
+        <td class="opt"><span class="name">--json</span><span class="ex">status --mine --json</span><span class="why">Machine-readable output, for scripts and jobs.</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+        <td><span class="c acc">optional</span></td>
+        <td><span class="c no">—</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <ul class="notes">
+    <li><b>Without any subcommand:</b> the hook still records every open, navigation and close by itself. The command only adds what the hook can't guess, and the authorization.</li>
+    <li><b>A scheduled job without a shell</b> sets <span class="mono">CHROME_PURPOSE</span> and <span class="mono">CHROME_VISIBLE_BECAUSE</span> in its environment instead of running authorize-tab.</li>
+    <li><b>Scripts</b> (headless) don't use this command: they call <span class="mono">headless(data_dir, purpose, url, keep, needs_human, flags)</span>; <span class="mono">data_dir</span> and <span class="mono">purpose</span> required.</li>
+    <li><b>Old names</b> <span class="mono">chrome-claim</span> and <span class="mono">chrome-who</span> keep working until 8 Nov 2026.</li>
+  </ul>
+
+  <footer>Source: <span class="mono">/Users/jeanlescut/dev/my-setup/chrome/</span> · skill <span class="mono">chrome</span> · plan: <span class="mono">doc/chrome-visibility/overview.html</span></footer>
+</div>

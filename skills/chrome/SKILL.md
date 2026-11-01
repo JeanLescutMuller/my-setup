@@ -18,7 +18,13 @@ description: How an agent uses Chrome on this Mac - the 5 questions to answer fi
 
 ### 1. May I open a tab? (security)
 
-Only after `agent-chrome authorize-tab "<why, in words the user understands>"` with `--needs-human "<what the user must do>"` or `--visible-because "<why headless cannot do it>"`. Until then the hook refuses to open a page. The authorization belongs to this session only, for its whole life. Never start a Chrome from the shell (`open -a/-na "Google Chrome"`, the Chrome binary): the hook refuses it, nobody could see or close that window.
+Only after `agent-chrome authorize-tab "<why>" --visibility invisible|unfocused|focused --visibility-reason "<why this level>"` (`--project P` too when your folder is not inside `~/dev/<repo>`). Until then the hook refuses to open a page. The authorization belongs to this session only (read from `$CLAUDE_CODE_SESSION_ID`, which Claude Code sets in every agent shell; the hook gets the same id), for its whole life. **Always name your project**: inside `~/dev/<repo>` it is that repo (another value is refused); anywhere else `--project` is required, and it decides which profiles you may use.
+
+| `--visibility` | Means | The kit enforces |
+|---|---|---|
+| `invisible` | headless Chrome through the launcher only | the hook refuses any Claude in Chrome tab; the launcher requires this level inside a session |
+| `unfocused` | a Claude in Chrome tab in your project's window, never in front | the default for visible work |
+| `focused` | the same, and the window comes to the front once | only after `mark-as-needing-human`, never without a need | Never start a Chrome from the shell (`open -a/-na "Google Chrome"`, the Chrome binary): the hook refuses it, nobody could see or close that window.
 
 It does not limit sites or actions inside the tab: stay on what the user asked for (job-applications has its own site list, `common/browser_policy.py`).
 
@@ -63,7 +69,7 @@ with headless(Path.home() / 'opt/<repo>/chrome', purpose='…', url='https://exa
 | `data_dir`, `purpose` | required |
 | `url`, `keep=False`, `needs_human=None`, `flags=()` | optional. `keep=True`: leave Chrome and the tab for the next run of the same job or project. `flags`: extra Chrome options (`'--disk-cache-size=…'`) |
 
-A killed caller never leaves Chrome running (a watcher quits it and records the close, unless `keep=True`); a data folder a visible Chrome already uses is refused. CLI for tests: `launch_headless.py --data-dir D --purpose P --url U [--keep] | --close`. Logging a tool's Chrome in once: open the same data folder **without** headless at the site's login page, the user logs in and quits with cmd+Q; from then on a login form on the page = logged out: ask the user again, never type a password.
+Inside a Claude session, `headless()` first requires `agent-chrome authorize-tab "<why>" --visibility invisible --visibility-reason "…"`. A killed caller never leaves Chrome running (a watcher quits it and records the close, unless `keep=True`); a data folder a visible Chrome already uses is refused. CLI for tests: `launch_headless.py --data-dir D --purpose P --url U [--keep] | --close`. Logging a tool's Chrome in once: open the same data folder **without** headless at the site's login page, the user logs in and quits with cmd+Q; from then on a login form on the page = logged out: ask the user again, never type a password.
 
 ### 4. If visible: which window? (the user's comfort)
 
@@ -79,25 +85,25 @@ Never in front of the user. Claude in Chrome actions (create a tab, navigate, cl
 
 | When | Do |
 |---|---|
-| the user must act (log in, captcha, upload, check before sending) | `agent-chrome mark-as-needing-human "<exact steps, full file paths>"`: red bar "NEEDS HUMAN: …" on the tab, badge "!"; say in chat which tab and what to do |
+| the user must act (log in, captcha, upload, check before sending): right after opening the tab, or later | `agent-chrome mark-as-needing-human "<exact steps, full file paths>"`: red bar "NEEDS HUMAN: …" on the tab, badge "!"; say in chat which tab and what to do |
 | their part is over | `agent-chrome mark-as-human-done` |
 | the hook adds "Message from the user" | the user typed it in the tab's side panel: act on it as their request, answer with `agent-chrome reply-to-human "<text>"` (shown on the tab) |
 | end of the work (done, failed or nothing found) | `tabs_close_mcp` on every tab of your group; check with `tabs_context_mcp` (no `createIfEmpty`) that no group is left; say "tabs closed (checked)". The hook reminds you once at the end of a turn that leaves a tab open with no human needed |
 | keeping a tab | only while a human is needed in it (marked with `mark-as-needing-human`) |
-| a scheduled job without Bash | it sets `CHROME_PURPOSE` and `CHROME_VISIBLE_BECAUSE` in its environment instead of `authorize-tab`; `JR_JOB` names the job |
+| a scheduled job without Bash | it sets `CHROME_PURPOSE`, `CHROME_VISIBILITY` (default `unfocused`) and `CHROME_VISIBILITY_REASON` in its environment instead of `authorize-tab`; `JR_JOB` names the job |
 
 ## `agent-chrome`
 
 | Subcommand | Required | Optional | Does |
 |---|---|---|---|
-| `authorize-tab "<why>"` | `--needs-human "…"` or `--visible-because "…"` | `--session ID` (default `$CLAUDE_CODE_SESSION_ID`) | the session's authorization; its reason shows on its tabs |
+| `authorize-tab "<why>"` | `--visibility invisible\|unfocused\|focused`, `--visibility-reason "…"`; `--project P` outside a repo folder | `--project P` inside a repo (must match it) | the session's authorization; its reason shows on its tabs |
 | `mark-as-needing-human "<what to do>"` | | | red "NEEDS HUMAN: …" bar, badge "!" |
 | `mark-as-human-done` | | | clears it: "✓ done, you may close" |
 | `reply-to-human "<text>"` | | | the agent's answer in the tab's thread |
 | `status` | | `--mine`, `--since 7d`, `--project P`, `--json` | open agent tabs (when, session, project, why, needs human), running Chromes, BLIND warning; history with `--since` |
 | `open-profile-window` | | `--project P` | the project's profile window, in the background |
 
-`chrome-claim` and `chrome-who` are the old names, kept until 2026-11-08.
+The 4 session commands work only inside a Claude Code session. `chrome-claim` and `chrome-who` are the old names, kept until 2026-11-08. Options table: `~/dev/my-setup/doc/chrome-visibility/agent-chrome-options.html`.
 
 ## Leftovers: who opened what, and close it
 

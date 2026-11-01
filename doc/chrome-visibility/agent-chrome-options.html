@@ -58,10 +58,10 @@ footer{font-size:12.5px;color:var(--muted)}
   <header style="display:grid;gap:10px">
     <div class="eyebrow">Chrome kit · my-setup · 1 Nov 2026</div>
     <h1>Options of <code>agent-chrome</code></h1>
-    <p class="muted">One column per subcommand, one row per option. Each cell says whether that subcommand refuses, accepts or requires the option. Installed 1 Nov 2026 and checked against <code>agent-chrome --help</code>: every cell matches.</p>
+    <p class="muted">One column per subcommand, one row per option. Each cell says whether that subcommand refuses, accepts or requires the option. Version 2 (1 Nov 2026): <span class="mono">--visibility</span> and <span class="mono">--visibility-reason</span> replace <span class="mono">--needs-human</span> and <span class="mono">--visible-because</span> on authorize-tab; <span class="mono">--session</span> is gone. Installed and checked against <code>agent-chrome --help</code>: every cell matches.</p>
     <div class="legend">
       <span class="c req">required</span>
-      <span class="c one">one of the two required</span>
+      <span class="c one">required in some cases</span>
       <span class="c acc">optional</span>
       <span class="c no">not accepted</span>
     </div>
@@ -72,8 +72,8 @@ footer{font-size:12.5px;color:var(--muted)}
     <thead>
       <tr>
         <th class="opt"><span class="eyebrow">Option</span></th>
-        <th><span class="sub">authorize-tab</span><span class="what">Gets permission for this session to open its tab; records why.</span><span class="when"><b>When</b>Once per session, before its first page.</span></th>
-        <th><span class="sub">mark-as-needing-human</span><span class="what">Red "NEEDS HUMAN: …" bar and "!" badge on the session's tabs.</span><span class="when"><b>When</b>The user must act: log in, captcha, upload, check.</span></th>
+        <th><span class="sub">authorize-tab</span><span class="what">Gets permission for this session to use Chrome; records why, how visible, for which project.</span><span class="when"><b>When</b>Once per session, before its first page (also before a headless launch).</span></th>
+        <th><span class="sub">mark-as-needing-human</span><span class="what">Red "NEEDS HUMAN: …" bar and "!" badge on the session's tabs; with visibility focused, brings the window to the front once.</span><span class="when"><b>When</b>Right after opening the tab, or later: the user must log in, solve a captcha, upload, check.</span></th>
         <th><span class="sub">mark-as-human-done</span><span class="what">Clears "needs human": "✓ done, you may close".</span><span class="when"><b>When</b>The user's part is over.</span></th>
         <th><span class="sub">reply-to-human</span><span class="what">The agent's answer, shown in the tab's side panel and bar.</span><span class="when"><b>When</b>The hook passed on a "Message from the user".</span></th>
         <th><span class="sub">status</span><span class="what">Reads only: open agent tabs, running Chromes, history.</span><span class="when"><b>When</b>Before opening anything (<span class="mono">--mine</span>); "who opened what?"; leftovers.</span></th>
@@ -100,30 +100,23 @@ footer{font-size:12.5px;color:var(--muted)}
         <td><span class="c no">—</span></td><td><span class="c no">—</span></td>
       </tr>
 
-      <tr class="group"><th colspan="7">Why the tab is visible (a Claude in Chrome tab is always visible)</th></tr>
+      <tr class="group"><th colspan="7">How visible the session's Chrome is</th></tr>
       <tr>
-        <td class="opt"><span class="name">--needs-human "…"</span><span class="ex">--needs-human "Log in to Temu"</span><span class="why">A human must act in the tab right from the start. Same effect as running mark-as-needing-human afterwards.</span></td>
-        <td><span class="c one">one of 2 required</span><span class="note">for a Claude in Chrome tab; scripts use the launcher instead</span></td>
+        <td class="opt"><span class="name">--visibility LEVEL</span><span class="ex">invisible · unfocused · focused</span><span class="why"><b>invisible</b>: headless Chrome through the launcher only; the hook refuses any Claude in Chrome tab. <b>unfocused</b>: a Claude in Chrome tab in the project's window, never in front. <b>focused</b>: the same, and the window comes to the front once, only after mark-as-needing-human.</span></td>
+        <td><span class="c req">required</span></td>
         <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
       </tr>
       <tr>
-        <td class="opt"><span class="name">--visible-because "…"</span><span class="ex">--visible-because "LinkedIn needs the logged-in profile"</span><span class="why">No human action needed, but a headless Chrome can't do it (usually: only the visible profile is logged in).</span></td>
-        <td><span class="c one">one of 2 required</span></td>
+        <td class="opt"><span class="name">--visibility-reason "…"</span><span class="ex">"LinkedIn needs the logged-in profile"</span><span class="why">Why this level was chosen, in words the user understands. Shown in the tab's side panel and in status.</span></td>
+        <td><span class="c req">required</span></td>
         <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
       </tr>
 
-      <tr class="group"><th colspan="7">Which session, which project</th></tr>
+      <tr class="group"><th colspan="7">Which project</th></tr>
       <tr>
-        <td class="opt"><span class="name">--session ID</span><span class="ex">--session 3f2a9c1e-77b0-…</span><span class="why">The Claude session this is about. Default: <span class="mono">$CLAUDE_CODE_SESSION_ID</span>, which every Claude Code shell has, so agents rarely need it.</span></td>
-        <td><span class="c acc">optional</span></td>
-        <td><span class="c acc">optional</span></td>
-        <td><span class="c acc">optional</span></td>
-        <td><span class="c acc">optional</span></td>
-        <td><span class="c no">—</span></td><td><span class="c no">—</span></td>
-      </tr>
-      <tr>
-        <td class="opt"><span class="name">--project P</span><span class="ex">--project job-applications</span><span class="why">Another project than the current folder's (the project = the name of the folder's git repo).</span></td>
-        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
+        <td class="opt"><span class="name">--project P</span><span class="ex">--project job-applications</span><span class="why">The project the session works for. Inside <span class="mono">~/dev/&lt;repo&gt;</span> it defaults to that repo, and another value is refused. Anywhere else it must be given. It decides which profiles the session may use (LinkedIn: job-applications only).</span></td>
+        <td><span class="c one">required outside a repo</span><span class="note">optional inside ~/dev/&lt;repo&gt; or ~/opt/&lt;repo&gt;</span></td>
+        <td><span class="c no">—</span></td><td><span class="c no">—</span></td><td><span class="c no">—</span></td>
         <td><span class="c acc">optional</span><span class="note">only this project's tabs</span></td>
         <td><span class="c acc">optional</span><span class="note">that project's profile window</span></td>
       </tr>
@@ -153,7 +146,8 @@ footer{font-size:12.5px;color:var(--muted)}
 
   <ul class="notes">
     <li><b>Without any subcommand:</b> the hook still records every open, navigation and close by itself. The command only adds what the hook can't guess, and the authorization.</li>
-    <li><b>A scheduled job without a shell</b> sets <span class="mono">CHROME_PURPOSE</span> and <span class="mono">CHROME_VISIBLE_BECAUSE</span> in its environment instead of running authorize-tab.</li>
+    <li><b>Which session:</b> always the one running the command, read from <span class="mono">$CLAUDE_CODE_SESSION_ID</span> (Claude Code sets it in every agent shell; the hook gets the same id). Outside Claude Code the 4 session commands refuse to run; status and open-profile-window work anywhere.</li>
+    <li><b>A scheduled job without a shell</b> sets <span class="mono">CHROME_PURPOSE</span>, <span class="mono">CHROME_VISIBILITY</span> and <span class="mono">CHROME_VISIBILITY_REASON</span> in its environment instead of running authorize-tab.</li>
     <li><b>Scripts</b> (headless) don't use this command: they call <span class="mono">headless(data_dir, purpose, url, keep, needs_human, flags)</span>; <span class="mono">data_dir</span> and <span class="mono">purpose</span> required.</li>
     <li><b>Old names</b> <span class="mono">chrome-claim</span> and <span class="mono">chrome-who</span> keep working until 8 Nov 2026.</li>
   </ul>

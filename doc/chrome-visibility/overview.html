@@ -302,13 +302,13 @@ footer{color:var(--muted);font-size:12.5px}
   <div class="lane run"><header><h3>4 · If visible: which window?</h3><small>your comfort</small></header><ul>
     <li class="req" data-s="s-ok"><span class="id">4a</span><span class="t">Ask what is open first</span><span class="d"><span class="mono">chrome-claim open</span>: the tabs open for my project, by any session or job; one tab per session.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
     <li class="req" data-s="s-ok"><span class="id">4b</span><span class="t">A job never piles up windows</span><span class="d">auto-job-apply closes its old tab nobody waits on, and never opens a second tab for a job still waiting on you.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
-    <li class="req" data-s="s-inv"><span class="id">4c</span><span class="t">One agent window per project</span><span class="d">Every session of a project puts its tab in that project's agent window; a new window only if none exists. Your own windows are never touched. Being tested: can Claude in Chrome put a session's tabs in an existing window?</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">4c</span><span class="t">One agent window per project</span><span class="d">Every session of a project gets its tab in that project's agent window: the extension moves it there (tested live: Claude in Chrome keeps control after the move). A new window only if the project has none. Your tabs are never moved.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
   </ul></div>
 
   <div class="lane run"><header><h3>5 · If visible: focus?</h3><small>your comfort</small></header><ul>
-    <li class="req" data-s="s-inv"><span class="id">5a</span><span class="t">Never take focus</span><span class="d">An agent window opens and works in the background, never in front of what you are typing.</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
-    <li class="req" data-s="s-inv"><span class="id">5b</span><span class="t">On the project's desktop</span><span class="d">Each project's agent window lives on that project's macOS desktop (you have 4). Being tested: Hammerspoon moving a window to a desktop.</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
-    <li class="req" data-s="s-inv"><span class="id">5c</span><span class="t">The kit opens a missing profile itself</span><span class="d">In the background, on the right desktop, instead of asking you; replaces the job-applications-only exception.</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">5a</span><span class="t">Never take focus</span><span class="d">Agent actions never bring Chrome forward (tested). Opening a window always does for a moment, so <span class="mono">chrome-claim window</span> gives the focus back at once.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">5b</span><span class="t">On the project's desktop</span><span class="d">macOS 26 lets no program move a window to another desktop: a project's window opens on your current desktop, you drag it once to the project's desktop, it stays there (again after a Chrome restart).</span><span class="meta"><span class="pill s-ok">by hand</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">5c</span><span class="t">The kit opens a missing profile itself</span><span class="d"><span class="mono">chrome-claim window</span> opens the project's profile window in the background, only if it has none; agents no longer ask you.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
   </ul></div>
 
   <div class="lane vis"><header><h3>Who opened what</h3><small>for you and for agents</small></header><ul>
@@ -361,7 +361,7 @@ footer{color:var(--muted);font-size:12.5px}
       <li><span class="pill s-ok">done 1 Nov</span> <b>job-applications.</b> Recorded, "YOUR TURN" on a kept tab, no duplicates, BLIND.</li>
       <li><span class="pill s-ok">done 1 Nov</span> <b>Scripts.</b> marketplace-seller, robotics-radar, smart-home, password layer; trading-bot's render no longer quits every Chrome.</li>
       <li><span class="pill s-ok">done 1 Nov</span> <b>Kit fixes.</b> One profile per session (2c), watchdog (3c), extra Chrome options, busy data folder, a false refusal on text that only mentions Chrome.</li>
-      <li><span class="pill s-inv">tested in part</span> <b>Questions 4 and 5.</b> Agent actions never take focus; tabs already go into the profile's last-used window; a window cannot be moved to another desktop by code (macOS 26). Next: the extension moves each session's tabs into its project's window; a kit command opens a profile window in the background.</li>
+      <li><span class="pill s-ok">done 1 Nov</span> <b>Questions 4 and 5.</b> One agent window per project; never in front; <span class="mono">chrome-claim window</span>; you place each project window on its desktop once.</li>
     </ol>
   </div>
   <div class="card">
@@ -371,7 +371,7 @@ footer{color:var(--muted);font-size:12.5px}
     <div class="dec"><span class="q">One tab per session</span><span class="pick">yes</span></div>
     <div class="dec"><span class="q">End-of-turn reminder</span><span class="pick">yes</span></div>
     <div class="dec"><span class="q">Keep separate profiles (honest-mistake boundary)</span><span class="pick">yes</span><span class="why">Not one shared profile.</span></div>
-    <div class="dec"><span class="q">Your window + one agent window per project</span><span class="pick">yes</span><span class="why">Option B; being tested.</span></div>
+    <div class="dec"><span class="q">Your window + one agent window per project</span><span class="pick">yes</span><span class="why">Option B; built 1 Nov.</span></div>
     <div class="dec"><span class="q">Alerts to you</span><span class="pick">out of scope</span><span class="why">Each agent decides; the kit only gives it the facts.</span></div>
   </div>
 </section>

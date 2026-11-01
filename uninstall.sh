@@ -2,7 +2,7 @@
 # Removes what modules/agent_links.sh deploys: the skill links
 # in ~/.claude/skills and ~/.agents/skills
 # (only links that point into ~/opt/my-setup), then the read-only copies
-# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc; the Hammerspoon config link (modules/hammerspoon.sh).
+# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc; the Hammerspoon config link (modules/hammerspoon.sh); the Chrome kit (modules/chrome_kit.sh: its code, chrome-claim, chrome-who, and its hook groups in ~/.claude/settings.json; its record in ~/opt/my-setup/state/chrome/ is kept).
 # Dotfiles, the shell rc block, git config and the tools are left alone.
 #
 # Usage: bash uninstall.sh
@@ -56,6 +56,33 @@ for dst in "$_ctx"/snapshot/skills/*/; do
     done
 done
 warn "kept $_ctx (the local copy and history.git): agents now start without the machine-wide rules"
+
+step "chrome kit"
+if [ "$(uname)" = Darwin ]; then
+    # hook groups first, so no session calls a hook whose file is gone (the command also checks the file)
+    SETTINGS="$HOME/.claude/settings.json" python3 - <<'PYEOF' && installed "removed the Chrome kit hook groups"
+import json, os
+path, ID = os.environ['SETTINGS'], 'opt/my-setup/chrome/hook.py'
+with open(path) as f:
+    data = json.load(f)
+hooks = data.get('hooks', {})
+for ev in list(hooks):
+    hooks[ev] = [g for g in hooks[ev] if not any(ID in h.get('command', '') for h in g.get('hooks', []))]
+    if not hooks[ev]:
+        del hooks[ev]
+with open(path + '.tmp', 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+os.replace(path + '.tmp', path)
+PYEOF
+    _remove_link "$HOME/.local/bin/chrome-claim" "$OPT_DIR/chrome/chrome_claim.py"
+    _remove_link "$HOME/.local/bin/chrome-who" "$OPT_DIR/chrome/chrome_who.py"
+    for f in hook.py chrome_kit.py chrome_claim.py chrome_who.py launch_headless.py; do
+        [ -f "$OPT_DIR/chrome/$f" ] && rm "$OPT_DIR/chrome/$f" && installed "removed $OPT_DIR/chrome/$f"
+    done
+    [ -d "$OPT_DIR/chrome" ] && rmdir "$OPT_DIR/chrome" 2>/dev/null && installed "removed $OPT_DIR/chrome"
+    warn "kept $OPT_DIR/state/chrome (the record of what agents opened)"
+fi
 
 step "hammerspoon"
 if [ "$(uname)" = Darwin ]; then

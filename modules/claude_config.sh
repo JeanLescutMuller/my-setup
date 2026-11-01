@@ -101,3 +101,57 @@ with open(path, "w") as f:
         installed "removed retired $key"
     fi
 done
+
+# The Chrome kit's hook groups under "hooks" (macOS only, once modules/chrome_kit.sh deployed hook.py).
+# "hooks" is shared: agent-session-manager's install.sh owns its SessionStart/SessionEnd groups; this module owns
+# only the groups whose command contains opt/my-setup/chrome/hook.py, replaces just those, keeps everything else
+# (the same rule asm follows). The command checks the file first: a missing script would make python exit 2, which
+# Claude Code reads as "block this tool call"; `|| true` keeps the hook failing open.
+_ck_hook="$HOME/opt/my-setup/chrome/hook.py"
+if [ "$(uname)" = Darwin ] && [ -f "$_ck_hook" ]; then
+    _ck_state=$(INSTALL="$INSTALL" SETTINGS="$SETTINGS" python3 - <<'PYEOF'
+import json, os
+ID = 'opt/my-setup/chrome/hook.py'
+CMD = '[ ! -f "$HOME/opt/my-setup/chrome/hook.py" ] || python3 -I "$HOME/opt/my-setup/chrome/hook.py" || true'
+hook = {'type': 'command', 'command': CMD, 'timeout': 10}
+WANT = {  # event -> matchers
+    'PreToolUse': ['mcp__claude-in-chrome__.*', 'Bash'],
+    'PostToolUse': ['mcp__claude-in-chrome__.*'],
+    'UserPromptSubmit': [''],
+    'Stop': [''],
+}
+path = os.environ['SETTINGS']
+with open(path) as f:
+    data = json.load(f)
+hooks = data.setdefault('hooks', {})
+mine = lambda g: any(ID in h.get('command', '') for h in g.get('hooks', []))
+same = all([g for g in hooks.get(ev, []) if mine(g)] == [{'matcher': m, 'hooks': [hook]} for m in l_m] for ev, l_m in WANT.items()) \
+    and not any(mine(g) for ev, l_g in hooks.items() if ev not in WANT for g in l_g)
+if same:
+    print('ok')
+elif os.environ['INSTALL'] != 'true':
+    print('skip')
+else:
+    for ev in list(hooks):
+        hooks[ev] = [g for g in hooks[ev] if not mine(g)]
+        if not hooks[ev]:
+            del hooks[ev]
+    for ev, l_m in WANT.items():
+        hooks.setdefault(ev, []).extend({'matcher': m, 'hooks': [hook]} for m in l_m)
+    tmp = path + '.tmp'
+    with open(tmp, 'w') as f:
+        json.dump(data, f, indent=2)
+        f.write('\n')
+    os.replace(tmp, path)
+    print('installed')
+PYEOF
+)
+    case "$_ck_state" in
+        ok) ok "hooks: Chrome kit groups" ;;
+        skip) skip "hooks: Chrome kit groups" ;;
+        installed) installed "hooks: Chrome kit groups (PreToolUse x2, PostToolUse, UserPromptSubmit, Stop)" ;;
+        *) fail "hooks: Chrome kit groups ($_ck_state)" ;;
+    esac
+elif [ "$(uname)" = Darwin ]; then
+    skip "hooks: Chrome kit groups ($_ck_hook not deployed: run the chrome_kit module first)"
+fi

@@ -1,0 +1,385 @@
+<title>Agent Chrome Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a map, not a report. Areas = colored lanes; each requirement is a row with a status pill. */
+:root{
+  --bg:#f6f7fb; --panel:#ffffff; --ink:#1b1f2e; --muted:#5d6479; --line:#dfe3ee;
+  --vis:#2563eb; --vis-bg:#e7efff;
+  --log:#c27c0e; --log-bg:#fff4dc;
+  --com:#0f8a5f; --com-bg:#e1f6ec;
+  --run:#7c3aed; --run-bg:#efe7ff;
+  --cln:#d03a4a; --cln-bg:#fde8ea;
+  --ok:#0f8a5f; --proto:#2563eb; --build:#c27c0e; --inv:#7c3aed; --bad:#d03a4a;
+  --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",ui-sans-serif,system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11131c; --panel:#1a1d29; --ink:#e8eaf3; --muted:#9aa1b8; --line:#2c3142;
+  --vis:#7aa7ff; --vis-bg:#1b2747; --log:#f0b44c; --log-bg:#3a2c12;
+  --com:#4fd39d; --com-bg:#123628; --run:#b393ff; --run-bg:#2a1f47;
+  --cln:#ff7d8a; --cln-bg:#41191f;
+  --ok:#4fd39d; --proto:#7aa7ff; --build:#f0b44c; --inv:#b393ff; --bad:#ff7d8a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11131c; --panel:#1a1d29; --ink:#e8eaf3; --muted:#9aa1b8; --line:#2c3142;
+  --vis:#7aa7ff; --vis-bg:#1b2747; --log:#f0b44c; --log-bg:#3a2c12;
+  --com:#4fd39d; --com-bg:#123628; --run:#b393ff; --run-bg:#2a1f47;
+  --cln:#ff7d8a; --cln-bg:#41191f;
+  --ok:#4fd39d; --proto:#7aa7ff; --build:#f0b44c; --inv:#b393ff; --bad:#ff7d8a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:28px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:34px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0}
+h1{font-size:clamp(28px,4.4vw,44px);font-weight:800;letter-spacing:-.02em}
+h2{font-size:22px;font-weight:800}
+h3{font-size:16px;font-weight:600}
+p{margin:0}
+.lede{color:var(--muted);max-width:70ch}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+section{display:grid;gap:14px}
+.mono{font-family:var(--mono);font-size:12.5px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap;border:1.5px solid currentColor}
+.s-ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.s-proto{color:var(--proto);background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--proto) 16%,transparent) 0 5px,transparent 5px 10px)}
+.s-build{color:var(--build)}
+.s-inv{color:var(--inv);border-style:dashed}
+.s-bad{color:#fff;background:var(--bad);border-color:var(--bad)}
+.today{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.issue{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--bad);border-radius:6px;padding:12px 14px;display:grid;gap:4px}
+.issue b{font-family:var(--display);font-size:15px}
+.issue span{color:var(--muted);font-size:13.5px}
+.filters{display:flex;flex-wrap:wrap;gap:8px}
+.filters button{font:600 13px var(--body);padding:6px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.filters button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+.filters button:focus-visible{outline:2px solid var(--vis);outline-offset:2px}
+.lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;align-items:start}
+.lane{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.lane header{padding:12px 16px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.lane header small{font-family:var(--mono);font-size:11px;opacity:.85}
+.lane.vis header{background:var(--vis-bg);color:var(--vis)}
+.lane.com header{background:var(--com-bg);color:var(--com)} .lane.run header{background:var(--run-bg);color:var(--run)}
+.lane.cln header{background:var(--cln-bg);color:var(--cln)}
+.lane ul{list-style:none;margin:0;padding:4px 0}
+.sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 16px 2px;border-top:1px solid var(--line)}
+.sub:first-child{border-top:0}
+.req{display:grid;grid-template-columns:42px 1fr;gap:2px 10px;padding:9px 16px;border-top:1px solid var(--line)}
+.sub + .req{border-top:0}
+.req .id{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--muted);padding-top:2px}
+.req .t{font-weight:700}
+.req .d{grid-column:2;color:var(--muted);font-size:13.5px}
+.req .meta{grid-column:2;display:flex;flex-wrap:wrap;gap:6px;margin-top:3px;align-items:center}
+.tag{font-family:var(--mono);font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+/* diagram */
+.diagram{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;overflow-x:auto}
+.diagram svg{display:block;width:100%;min-width:820px;height:auto}
+.diagram text{font-family:var(--body);fill:var(--ink)}
+.diagram .h{font-family:var(--mono);font-size:11px;letter-spacing:.1em;fill:var(--muted)}
+.diagram .t{font-size:14px;font-weight:700}
+.diagram .s{font-size:12px;fill:var(--muted)}
+.diagram .m{font-family:var(--mono);font-size:11.5px}
+.diagram .box{fill:var(--panel);stroke-width:2}
+.diagram .b-vis{stroke:var(--vis)} .diagram .b-log{stroke:var(--log)} .diagram .b-run{stroke:var(--run)} .diagram .b-cln{stroke:var(--cln)} .diagram .b-com{stroke:var(--com)}
+.diagram .f-vis{fill:var(--vis-bg)} .diagram .f-log{fill:var(--log-bg)} .diagram .f-run{fill:var(--run-bg)} .diagram .f-com{fill:var(--com-bg)}
+.diagram .kit{fill:var(--bg);stroke:var(--ink);stroke-width:2}
+.diagram .ar{stroke:var(--muted);stroke-width:2;fill:none}
+.diagram .ar.d{stroke-dasharray:5 4}
+.diagram .ah{fill:var(--muted)}
+.diagram .dash{stroke-dasharray:6 4}
+/* tables */
+.tablebox{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+.wide{min-width:860px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+tbody tr:last-child td{border-bottom:0}
+td.proj{font-weight:700;white-space:nowrap}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.how{font-family:var(--mono);font-size:12px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:10px;min-width:0;align-content:start}
+ol.phases{margin:0;padding-left:22px;display:grid;gap:8px}
+ol.phases li::marker{font-family:var(--mono);font-weight:600;color:var(--muted)}
+.dec{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding-top:8px;border-top:1px solid var(--line)}
+.dec:first-of-type{border-top:0;padding-top:0}
+.dec .q{font-weight:700}
+.dec .why{grid-column:1/-1;color:var(--muted);font-size:13px}
+.pick{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--com)}
+.out{color:var(--muted);font-size:13.5px}
+footer{color:var(--muted);font-size:12.5px}
+</style>
+
+<div class="wrap">
+
+<header style="display:grid;gap:10px">
+  <div class="eyebrow">my-setup · chrome-visibility · 2026-11-01</div>
+  <h1>Agent Chrome Map</h1>
+  <p class="lede">A framework so that every agent on the MacBook uses Chrome properly: every tab says when it was opened, by which Claude session and for which project; any agent or you can ask what is open; Chrome stays invisible, or visible without stealing focus; nothing is left behind.</p>
+  <div class="legend">
+    <span class="pill s-ok">exists</span>
+    <span class="pill s-proto">prototyped &amp; tested</span>
+    <span class="pill s-build">to build</span>
+    <span class="pill s-inv">to investigate</span>
+  </div>
+  <p class="out"><b>Out of scope:</b> alerts and notifications to you. Each agent decides whether to open a task for you and whether to alert you; this framework only gives it the facts.</p>
+</header>
+
+<section>
+  <div class="eyebrow">What goes wrong today</div>
+  <div class="today">
+    <div class="issue"><b>Windows nobody explains</b><span>A tab says nothing about which session opened it, when, or for which project. You close them by hand (LinkedIn, 1 Nov: 2–3 windows from 3 auto-job-apply runs).</span></div>
+    <div class="issue"><b>"Your turn" is invisible</b><span>When an agent waits for you (captcha, file upload, login), the page itself shows nothing.</span></div>
+    <div class="issue"><b>Agents don't know what is already open</b><span>Each run opens a new window instead of reusing the one its project already has. A job retried 3 times leaves 3 windows.</span></div>
+    <div class="issue"><b>Rules are only text</b><span>Headless by default, right profile, close every tab: written in CLAUDE.md and skills, enforced almost nowhere.</span></div>
+    <div class="issue"><b>Window checks go blind</b><span>With two Chromes running, macOS window scripts see 0 windows and still report "closed (checked)".</span></div>
+    <div class="issue"><b>Windows jump to the front</b><span>Visible agent windows can come forward and take the focus while you type elsewhere.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Target design</div>
+  <h2>One Chrome kit in my-setup, every agent goes through it</h2>
+  <div class="diagram">
+  <svg viewBox="0 0 1000 540" role="img" aria-label="Agents use Chrome through the kit in my-setup, which writes what is open and the history; the tab, other agents, you and chrome-leftovers read it.">
+    <defs>
+      <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0,0 L10,5 L0,10 z"/></marker>
+    </defs>
+
+    <!-- column titles -->
+    <text class="h" x="20" y="24">WHO USES CHROME</text>
+    <text class="h" x="315" y="24">THE CHROME KIT (MY-SETUP)</text>
+    <text class="h" x="745" y="24">WHO READS IT</text>
+
+    <!-- left: users of Chrome -->
+    <rect class="box b-vis" x="20" y="40" width="240" height="78" rx="8"/>
+    <text class="t" x="34" y="66">Claude Code session</text>
+    <text class="s" x="34" y="86">Claude in Chrome tools</text>
+    <text class="s" x="34" y="104">skills linkedin, whatsapp, job-room…</text>
+
+    <rect class="box b-vis" x="20" y="138" width="240" height="78" rx="8"/>
+    <text class="t" x="34" y="164">Scheduled job (Agent SDK)</text>
+    <text class="s" x="34" y="184">Claude in Chrome tools</text>
+    <text class="s" x="34" y="202">auto-job-apply</text>
+
+    <rect class="box b-run" x="20" y="236" width="240" height="78" rx="8"/>
+    <text class="t" x="34" y="262">Script (Playwright / CDP)</text>
+    <text class="s" x="34" y="282">headless Chrome</text>
+    <text class="s" x="34" y="300">marketplace-seller, robotics-radar…</text>
+
+    <!-- kit -->
+    <rect class="kit" x="300" y="36" width="390" height="290" rx="12"/>
+
+    <rect class="box b-cln" x="318" y="52" width="354" height="104" rx="8"/>
+    <text class="t" x="332" y="76">hook — runs on every Claude in Chrome call</text>
+    <text class="s" x="332" y="97">refuses: your profile · another project's profile</text>
+    <text class="s" x="332" y="115">refuses: no reason given · a 2nd tab · visible Chrome from shell</text>
+    <text class="s" x="332" y="137">writes: opened · navigated · closed (also tabs you closed)</text>
+
+    <rect class="box b-log" x="500" y="170" width="172" height="78" rx="8"/>
+    <text class="t" x="514" y="194">chrome-claim</text>
+    <text class="s" x="514" y="214">reason · "your turn: …"</text>
+    <text class="s" x="514" y="232">done · what's open</text>
+
+    <rect class="box b-run" x="318" y="170" width="172" height="78" rx="8"/>
+    <text class="t" x="332" y="194">launcher</text>
+    <text class="s" x="332" y="214">headless · reuse last</text>
+    <text class="s" x="332" y="232">Chrome · close + check</text>
+
+    <text class="s" x="318" y="276">Every line carries: opened at · Claude session UUID ·</text>
+    <text class="s" x="318" y="294">project · profile · tab · url · reason · your turn</text>
+    <text class="s" x="318" y="312">(+ job name when a scheduled job opened it)</text>
+
+    <!-- arrows left -> kit -->
+    <path class="ar" d="M260,79 H318" marker-end="url(#arw)"/>
+    <path class="ar" d="M260,177 H290 V120 H318" marker-end="url(#arw)"/>
+    <path class="ar" d="M260,275 H280 V209 H318" marker-end="url(#arw)"/>
+
+    <!-- storage -->
+    <text class="h" x="322" y="364">KEPT IN ~/opt/my-setup/state/chrome/</text>
+    <rect class="box b-log f-log" x="300" y="384" width="186" height="96" rx="8"/>
+    <text class="t m" x="314" y="410">open.json</text>
+    <text class="s" x="314" y="432">what is open right now,</text>
+    <text class="s" x="314" y="450">one entry per tab;</text>
+    <text class="s" x="314" y="468">corrected on every call</text>
+
+    <rect class="box b-log" x="504" y="384" width="186" height="96" rx="8"/>
+    <text class="t m" x="518" y="410">history/2026-11.jsonl</text>
+    <text class="s" x="518" y="432">every event, one file</text>
+    <text class="s" x="518" y="450">per month; old months</text>
+    <text class="s" x="518" y="468">simply stay</text>
+
+    <path class="ar" d="M310,326 V384" marker-end="url(#arw)"/>
+    <path class="ar" d="M680,326 V384" marker-end="url(#arw)"/>
+
+    <!-- bus to readers -->
+    <path class="ar" d="M393,480 V510 H730 V79" />
+    <path class="ar" d="M730,79 H745" marker-end="url(#arw)"/>
+    <path class="ar" d="M730,177 H745" marker-end="url(#arw)"/>
+    <path class="ar" d="M730,275 H745" marker-end="url(#arw)"/>
+    <path class="ar" d="M730,373 H745" marker-end="url(#arw)"/>
+    <path class="ar d" d="M690,440 H716 V292 H745" marker-end="url(#arw)"/>
+
+    <!-- right: readers -->
+    <rect class="box b-vis f-vis" x="745" y="40" width="235" height="78" rx="8"/>
+    <text class="t" x="759" y="66">The tab itself</text>
+    <text class="s" x="759" y="86">bar: opened 14:02 · session ·</text>
+    <text class="s" x="759" y="104">project · YOUR TURN: steps</text>
+
+    <rect class="box b-vis" x="745" y="138" width="235" height="78" rx="8"/>
+    <text class="t" x="759" y="164">An agent, before opening</text>
+    <text class="s" x="759" y="184">"what's open for my project?"</text>
+    <text class="s" x="759" y="202">→ reuse it, close it, or open</text>
+
+    <rect class="box b-vis" x="745" y="236" width="235" height="78" rx="8"/>
+    <text class="t" x="759" y="262">You: chrome-who</text>
+    <text class="s" x="759" y="282">who opened what, when, why;</text>
+    <text class="s" x="759" y="300">history for older questions</text>
+
+    <rect class="box b-cln" x="745" y="334" width="235" height="78" rx="8"/>
+    <text class="t" x="759" y="360">chrome-leftovers</text>
+    <text class="s" x="759" y="380">what is still open and</text>
+    <text class="s" x="759" y="398">whether anyone waits on it</text>
+
+    <rect class="box b-com f-com dash" x="745" y="436" width="235" height="88" rx="8"/>
+    <text class="t" x="759" y="462">Talking to the agent</text>
+    <text class="s" x="759" y="482">comment box in our side panel</text>
+    <text class="s" x="759" y="500">→ the session that opened</text>
+    <text class="s" x="759" y="518">the tab, at its next step</text>
+  </svg>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">How it is stored, and why</div>
+  <h2>Two files: what is open now, and the history</h2>
+  <div class="tablebox"><table class="wide">
+    <thead><tr><th>Question</th><th>Who asks</th><th>How often</th><th>Answered from</th><th>Speed</th></tr></thead>
+    <tbody>
+      <tr><td>What is open for my project right now? Reuse it or open a new one?</td><td>every agent, before opening a tab</td><td class="num">dozens / day</td><td><span class="mono">open.json</span> (a few dozen entries, a few kB)</td><td class="num">&lt; 1 ms read</td></tr>
+      <tr><td>Who opened this tab, when, for which project?</td><td>the bar on the tab</td><td class="num">every page load</td><td><span class="mono">open.json</span></td><td class="num">&lt; 1 ms</td></tr>
+      <tr><td>Which tabs and Chromes are open now, by whom?</td><td>you (<span class="mono">chrome-who</span>), chrome-leftovers</td><td class="num">a few / week</td><td><span class="mono">open.json</span> + running Chrome processes</td><td class="num">~ 50 ms</td></tr>
+      <tr><td>What did project X open last week, and why?</td><td>you</td><td class="num">rare</td><td><span class="mono">history/&lt;month&gt;.jsonl</span></td><td class="num">~ 10 ms per month</td></tr>
+    </tbody>
+  </table></div>
+  <p class="out">One file per project would not be faster: the "open now" file stays tiny, and Python's start (~28 ms) costs more than reading it. One small file has one lock and one place to look. The "open now" file can drift from reality (you close a tab, Chrome restarts), so every Claude in Chrome answer, which lists the real open tabs, corrects it, and entries older than the browser's start are dropped.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Requirements and features</div>
+  <h2>Everything we want, by area</h2>
+  <div class="filters" role="group" aria-label="Filter by status">
+    <button type="button" id="f-all" data-f="all" aria-pressed="true">All</button>
+    <button type="button" id="f-ok" data-f="s-ok" aria-pressed="false">Exists</button>
+    <button type="button" id="f-proto" data-f="s-proto" aria-pressed="false">Prototyped</button>
+    <button type="button" id="f-build" data-f="s-build" aria-pressed="false">To build</button>
+    <button type="button" id="f-inv" data-f="s-inv" aria-pressed="false">To investigate</button>
+  </div>
+
+  <div class="lanes">
+
+  <div class="lane vis"><header><h3>Who opened what</h3><small>visibility + logs, one purpose</small></header><ul>
+    <li class="sub">On the tab</li>
+    <li class="req" data-s="s-build"><span class="id">W1</span><span class="t">Every tab carries 3 facts</span><span class="d">When it was opened (date and time), the UUID of the Claude session that opened it, and the project that session works for (its repo). Plus the job name when a scheduled job opened it.</span><span class="meta"><span class="pill s-proto">bar prototyped</span><span class="pill s-build">project field to add</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">W2</span><span class="t">"YOUR TURN" written on the page</span><span class="d">Red bar with the exact steps ("upload CV_2026.pdf, then press Send") and the file path.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">W3</span><span class="t">Never hide page content</span><span class="d">The 30 px bar pushes the page down, fixed headers and dialogs too. 0 elements covered on Google, LinkedIn, Facebook.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">W4</span><span class="t">Badge on the toolbar icon</span><span class="d">Red "!" you must act · grey "AI" agent working · green "✓" done.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">W5</span><span class="t">Quiet on watched sites</span><span class="d">On LinkedIn and Facebook, nothing on the page unless you must act (badge only), to limit bot detection.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="sub">Recorded, without the agent's goodwill</li>
+    <li class="req" data-s="s-proto"><span class="id">W6</span><span class="t">The hook records every open, navigation and close</span><span class="d">Runs on every Claude in Chrome call; tested with a real Claude session against a fake Chrome (37/37 checks). Tabs you close yourself are noticed too.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">W7</span><span class="t">A reason before opening anything</span><span class="d">The hook refuses to open a page until the agent ran <span class="mono">chrome-claim --purpose "…"</span>.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">W8</span><span class="t">Scripts recorded the same way</span><span class="d">Playwright/CDP scripts start Chrome only through the launcher, which records it.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">W9</span><span class="t">Scheduled Agent SDK jobs recorded too</span><span class="d">auto-job-apply's sessions don't load user hooks: the job passes the hook explicitly.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">job-applications</span></span></li>
+    <li class="sub">Asked for</li>
+    <li class="req" data-s="s-build"><span class="id">W10</span><span class="t">An agent asks "what's open for my project?"</span><span class="d">Before opening, it gets its project's open tabs (by any session, any job) and reuses, closes or opens accordingly.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">chrome-claim open</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">W11</span><span class="t">You ask "who opened what?"</span><span class="d">One command, <span class="mono">chrome-who</span>: every open agent tab and Chrome, with the 3 facts and the reason; <span class="mono">--since 7d</span> for the history.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">CLI partly prototyped</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">W12</span><span class="t">Window checks say when they are blind</span><span class="d">With two Chromes running, macOS scripts can't tell which one they see: say "BLIND", never "closed (checked)".</span><span class="meta"><span class="pill s-build">to build</span></span></li>
+  </ul></div>
+
+  <div class="lane com"><header><h3>Talking to the agent</h3><small>you ⇄ the session, from the tab</small></header><ul>
+    <li class="req" data-s="s-inv"><span class="id">C1</span><span class="t">Claude in Chrome's own side panel chat: ruled out</span><span class="d">Checked in its code (v1.0.104) and docs: nothing outside the extension can write into that chat, and what you type there goes to a separate Claude that acts on the same tab, never to the session that opened it.</span><span class="meta"><span class="pill s-bad">doesn't work</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">C2</span><span class="t">Our own comment box, in our side panel</span><span class="d">Your message reaches the session that opened the tab at its next step; the agent answers on the tab. Works in the test. A small box, not a chat app: it only carries text between you and that one session.</span><span class="meta"><span class="pill s-proto">prototyped</span><span class="tag">chosen</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">C3</span><span class="t">Agents act on what you write</span><span class="d">Needs one line in CLAUDE.md, or the agent ignores the message (tested: 0/2 without, 2/2 with).</span><span class="meta"><span class="pill s-proto">tested</span></span></li>
+    <li class="req" data-s="s-inv"><span class="id">C4</span><span class="t">Reach a session that is idle or has ended</span><span class="d">Idle: type the message into its tmux pane safely, as cc-rc does for /rc. Ended: the tab shows how to resume it (<span class="mono">asm resume &lt;id&gt;</span>).</span><span class="meta"><span class="pill s-inv">to investigate</span></span></li>
+  </ul></div>
+
+  <div class="lane run"><header><h3>Running Chrome</h3><small>invisible, or visible without stealing focus</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">R1</span><span class="t">Headless by default</span><span class="d">Reading, testing, scraping and scheduled jobs use a headless Chrome started by the launcher.</span><span class="meta"><span class="pill s-ok">exists (rule)</span><span class="pill s-proto">enforcement prototyped</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">R2</span><span class="t">Visible only when a human is needed</span><span class="d">A visible tab requires saying what you must do (captcha, login, upload). Otherwise: headless.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">decision</span></span></li>
+    <li class="req" data-s="s-inv"><span class="id">R3</span><span class="t">Visible windows never take the focus</span><span class="d">Agent windows open behind your work and never come to the front. To test: a separate macOS desktop (Space) for the agent profiles, starting Chrome in the background, minimized windows, scripts that never "activate".</span><span class="meta"><span class="pill s-inv">to investigate</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">R4</span><span class="t">Reuse the same window and tab</span><span class="d">Within a session: one tab, a second one is refused. Across runs: headless Chrome is reused (tested). A new session can't take over another session's Claude in Chrome tab, so it finds it (W10) and closes it before opening its own.</span><span class="meta"><span class="pill s-proto">prototyped</span><span class="tag">limit found</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">R5</span><span class="t">Right profile, never yours</span><span class="d">The hook refuses your Default profile (Bitwarden) and a profile that belongs to another project.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">R6</span><span class="t">Log a headless profile in once</span><span class="d">You log a site in once in a visible window; the headless runs reuse the login.</span><span class="meta"><span class="pill s-ok">exists</span><span class="tag">skill chrome-headless</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">R7</span><span class="t">No visible Chrome started from the shell</span><span class="d">The hook refuses <span class="mono">open -a "Google Chrome"</span> and similar.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+  </ul></div>
+
+  <div class="lane cln"><header><h3>Cleanup</h3><small>nothing left behind</small></header><ul>
+    <li class="req" data-s="s-proto"><span class="id">K1</span><span class="t">End-of-turn reminder</span><span class="d">If a tab is still open and nobody waits for you, the session is asked once: close it, or say what you must do.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">K2</span><span class="t">Kept tabs expire</span><span class="d">A tab kept for you has a deadline; after it, it closes and the history says so.</span><span class="meta"><span class="pill s-build">to build</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">K3</span><span class="t">chrome-leftovers reads "open now" first</span><span class="d">Who opened each leftover and why, straight from the record; old transcripts only for what has none.</span><span class="meta"><span class="pill s-build">to build</span></span></li>
+    <li class="req" data-s="s-proto"><span class="id">K4</span><span class="t">No orphan Chrome processes</span><span class="d">The launcher closes the Chrome it started and checks it is gone. Test helpers go through it too.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+  </ul></div>
+
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Projects</div>
+  <h2>Who uses Chrome, and what each needs</h2>
+  <div class="tablebox"><table class="wide">
+    <thead><tr><th>Project</th><th>How it uses Chrome</th><th>Profile</th><th>Runs</th><th>Needs from the kit</th></tr></thead>
+    <tbody>
+      <tr><td class="proj"><span class="dot" style="background:var(--cln)"></span>job-applications · auto-job-apply</td><td class="how">Agent SDK + Claude in Chrome</td><td>Claude - auto-job-apply</td><td>scheduled (job-runner)</td><td>W9 hook in SDK · W2 your-turn bar · W10 reuse/close old tab · W12 · C1</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--vis)"></span>skills: linkedin, linkedin-profile, job-room-work-efforts</td><td class="how">Claude in Chrome, by hand</td><td>auto-job-apply / general</td><td>by hand</td><td>W6 hook · W1 facts on tab · K1 · R5</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--com)"></span>skill whatsapp</td><td class="how">Claude in Chrome on WhatsApp Web</td><td>Claude - general</td><td>by hand</td><td>W6 · R3 no focus · W1</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--run)"></span>marketplace-seller</td><td class="how">headless Playwright, own data folder; Claude in Chrome for Facebook</td><td>Claude - Facebook + own folder</td><td>by hand / jobs</td><td>W8 launcher · R4 reuse · W5 quiet on Facebook</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--log)"></span>robotics-radar</td><td class="how">headless Chrome</td><td>own folder</td><td>scheduled</td><td>W8 launcher · K4</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--log)"></span>smart-home (map tests)</td><td class="how">Playwright tests</td><td>temporary</td><td>tests</td><td>W8 launcher · K4</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--log)"></span>trading-bot (doc tools)</td><td class="how">headless Chrome renders slides / SVG</td><td>temporary</td><td>by hand</td><td>W8 launcher · K4</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--cln)"></span>secrets-and-account-migration</td><td class="how">Playwright helper; left a visible Chrome running for days</td><td>temporary</td><td>by hand</td><td>W8 launcher · K4 · R7</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--muted)"></span>my-setup</td><td class="how">hosts the kit; skills chrome-headless, chrome-leftovers</td><td>all</td><td>-</td><td>installs the hook and the extension</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="cols">
+  <div class="card">
+    <div class="eyebrow">Rollout</div>
+    <h2>Order of work</h2>
+    <ol class="phases">
+      <li><b>The kit in my-setup.</b> Hook, <span class="mono">chrome-claim</span>, <span class="mono">chrome-who</span>, launcher, the two files; installed by my-setup; tests.</li>
+      <li><b>Extension in the 3 agent profiles.</b> Installer + one "Load unpacked" by you in each profile.</li>
+      <li><b>Rules.</b> One CLAUDE.md line; skills chrome-headless and chrome-leftovers rewritten on top of the kit.</li>
+      <li><b>job-applications.</b> SDK sessions go through the hook; "your turn" on the tab; reuse or close the old tab.</li>
+      <li><b>Scripts.</b> marketplace-seller, robotics-radar, smart-home, trading-bot, secrets-and-account-migration start Chrome through the launcher.</li>
+      <li><b>Investigations.</b> Windows that never take focus (R3), idle sessions (C4).</li>
+    </ol>
+  </div>
+  <div class="card">
+    <div class="eyebrow">Waiting on you</div>
+    <h2>Decisions</h2>
+    <div class="dec"><span class="q">Visible tab only with a stated "your turn" reason (R2)</span><span class="pick">pick: yes</span><span class="why">Otherwise any reason is enough to open a visible tab.</span></div>
+    <div class="dec"><span class="q">One tab per session (R4)</span><span class="pick">pick: yes</span><span class="why">A second tab is refused with "reuse tab N".</span></div>
+    <div class="dec"><span class="q">End-of-turn reminder (K1)</span><span class="pick">pick: yes</span><span class="why">Costs one extra model turn when a tab is left open.</span></div>
+    <div class="dec"><span class="q">Add the CLAUDE.md line (C3)</span><span class="pick">pick: yes</span><span class="why">Without it agents ignored your messages in the test.</span></div>
+    <div class="dec"><span class="q">my-setup installs the hooks</span><span class="pick">pick: yes</span><span class="why">Today agent-session-manager owns the hooks section; both keep their own entries.</span></div>
+  </div>
+</section>
+
+<footer>Sources: prototypes and tests in <span class="mono">/Users/jeanlescut/dev/my-setup/doc/chrome-visibility/</span> (observability/, on-page-note/), the job-applications session's findings of 1 Nov 2026. Nothing is installed yet.</footer>
+</div>
+
+<script>
+(function(){
+  var btns=document.querySelectorAll('.filters button');
+  btns.forEach(function(b){b.addEventListener('click',function(){
+    btns.forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+    var f=b.dataset.f;
+    document.querySelectorAll('.req').forEach(function(r){
+      r.hidden = !(f==='all' || r.dataset.s===f || r.querySelector('.'+f));
+    });
+    document.querySelectorAll('.sub').forEach(function(s){ s.hidden = f!=='all'; });
+  })});
+})();
+</script>

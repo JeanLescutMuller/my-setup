@@ -61,6 +61,7 @@ section{display:grid;gap:14px}
 .lane.vis header{background:var(--vis-bg);color:var(--vis)}
 .lane.com header{background:var(--com-bg);color:var(--com)} .lane.run header{background:var(--run-bg);color:var(--run)}
 .lane.cln header{background:var(--cln-bg);color:var(--cln)}
+.lane.log header{background:var(--log-bg);color:var(--log)}
 .lane ul{list-style:none;margin:0;padding:4px 0}
 .sub{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:10px 16px 2px;border-top:1px solid var(--line)}
 .sub:first-child{border-top:0}
@@ -116,7 +117,7 @@ footer{color:var(--muted);font-size:12.5px}
 <header style="display:grid;gap:10px">
   <div class="eyebrow">my-setup · chrome-visibility · 2026-11-01</div>
   <h1>Agent Chrome Map</h1>
-  <p class="lede">A framework so that every agent on the MacBook uses Chrome properly: every tab says when it was opened, by which Claude session and for which project; any agent or you can ask what is open; Chrome stays invisible, or visible without stealing focus; nothing is left behind.</p>
+  <p class="lede">A framework so that every agent on the MacBook uses Chrome properly: it answers 5 questions for each agent: may it open a tab, with which profile, headless or not, in which window, and without taking focus.</p>
   <div class="legend">
     <span class="pill s-ok">exists</span>
     <span class="pill s-proto">prototyped &amp; tested</span>
@@ -267,58 +268,64 @@ footer{color:var(--muted);font-size:12.5px}
 </section>
 
 <section>
-  <div class="eyebrow">Requirements and features</div>
-  <h2>Everything we want, by area</h2>
+  <div class="eyebrow">The 5 questions</div>
+  <h2>What every agent answers before using Chrome</h2>
   <div class="filters" role="group" aria-label="Filter by status">
     <button type="button" id="f-all" data-f="all" aria-pressed="true">All</button>
-    <button type="button" id="f-ok" data-f="s-ok" aria-pressed="false">Exists</button>
-    <button type="button" id="f-proto" data-f="s-proto" aria-pressed="false">Prototyped</button>
-    <button type="button" id="f-build" data-f="s-build" aria-pressed="false">To build</button>
-    <button type="button" id="f-inv" data-f="s-inv" aria-pressed="false">To investigate</button>
+    <button type="button" id="f-ok" data-f="s-ok" aria-pressed="false">Done</button>
+    <button type="button" id="f-build" data-f="s-build" aria-pressed="false">Being built / later</button>
+    <button type="button" id="f-inv" data-f="s-inv" aria-pressed="false">Being tested</button>
   </div>
 
   <div class="lanes">
 
-  <div class="lane vis"><header><h3>Who opened what</h3><small>visibility + logs, one purpose</small></header><ul>
-    <li class="sub">On the tab</li>
-    <li class="req" data-s="s-build"><span class="id">W1</span><span class="t">Every tab carries 3 facts</span><span class="d">When it was opened (date and time), the UUID of the Claude session that opened it, and the project that session works for (its repo). Plus the job name when a scheduled job opened it.</span><span class="meta"><span class="pill s-proto">bar prototyped</span><span class="pill s-build">project field to add</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">W2</span><span class="t">"YOUR TURN" written on the page</span><span class="d">Red bar with the exact steps ("upload CV_2026.pdf, then press Send") and the file path.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">W3</span><span class="t">Never hide page content</span><span class="d">The 30 px bar pushes the page down, fixed headers and dialogs too. 0 elements covered on Google, LinkedIn, Facebook.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">W4</span><span class="t">Badge on the toolbar icon</span><span class="d">Red "!" you must act · grey "AI" agent working · green "✓" done.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">W5</span><span class="t">Quiet on watched sites</span><span class="d">On LinkedIn and Facebook, nothing on the page unless you must act (badge only), to limit bot detection.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="sub">Recorded, without the agent's goodwill</li>
-    <li class="req" data-s="s-proto"><span class="id">W6</span><span class="t">The hook records every open, navigation and close</span><span class="d">Runs on every Claude in Chrome call; tested with a real Claude session against a fake Chrome (37/37 checks). Tabs you close yourself are noticed too.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">W7</span><span class="t">A reason before opening anything</span><span class="d">The hook refuses to open a page until the agent ran <span class="mono">chrome-claim --purpose "…"</span>.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">W8</span><span class="t">Scripts recorded the same way</span><span class="d">Playwright/CDP scripts start Chrome only through the launcher, which records it.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">W9</span><span class="t">Scheduled Agent SDK jobs recorded too</span><span class="d">auto-job-apply's sessions don't load user hooks: the job passes the hook explicitly.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">job-applications</span></span></li>
-    <li class="sub">Asked for</li>
-    <li class="req" data-s="s-build"><span class="id">W10</span><span class="t">An agent asks "what's open for my project?"</span><span class="d">Before opening, it gets its project's open tabs (by any session, any job) and reuses, closes or opens accordingly.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">chrome-claim open</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">W11</span><span class="t">You ask "who opened what?"</span><span class="d">One command, <span class="mono">chrome-who</span>: every open agent tab and Chrome, with the 3 facts and the reason; <span class="mono">--since 7d</span> for the history.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">CLI partly prototyped</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">W12</span><span class="t">Window checks say when they are blind</span><span class="d">With two Chromes running, macOS scripts can't tell which one they see: say "BLIND", never "closed (checked)".</span><span class="meta"><span class="pill s-build">to build</span></span></li>
+  <div class="lane cln"><header><h3>1 · May it open a tab?</h3><small>security</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">1a</span><span class="t">A reason first</span><span class="d">The hook refuses to open a page until the agent ran <span class="mono">chrome-claim --purpose "…"</span>; a scheduled job sets it in its environment.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">1b</span><span class="t">No Chrome started from the shell</span><span class="d">The hook refuses a visible Chrome launched from a terminal command: a window nobody tracks.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">1c</span><span class="t">Allowed sites per project (optional)</span><span class="d">A project may declare which sites its agents may open. job-applications already has its own list; the kit would let any project declare one.</span><span class="meta"><span class="pill s-build">later</span></span></li>
   </ul></div>
 
-  <div class="lane com"><header><h3>Talking to the agent</h3><small>you ⇄ the session, from the tab</small></header><ul>
-    <li class="req" data-s="s-inv"><span class="id">C1</span><span class="t">Claude in Chrome's own side panel chat: ruled out</span><span class="d">Checked in its code (v1.0.104) and docs: nothing outside the extension can write into that chat, and what you type there goes to a separate Claude that acts on the same tab, never to the session that opened it.</span><span class="meta"><span class="pill s-bad">doesn't work</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">C2</span><span class="t">Our own comment box, in our side panel</span><span class="d">Your message reaches the session that opened the tab at its next step; the agent answers on the tab. Works in the test. A small box, not a chat app: it only carries text between you and that one session.</span><span class="meta"><span class="pill s-proto">prototyped</span><span class="tag">chosen</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">C3</span><span class="t">Agents act on what you write</span><span class="d">Needs one line in CLAUDE.md, or the agent ignores the message (tested: 0/2 without, 2/2 with).</span><span class="meta"><span class="pill s-proto">tested</span></span></li>
-    <li class="req" data-s="s-inv"><span class="id">C4</span><span class="t">Reach a session that is idle or has ended</span><span class="d">Idle: type the message into its tmux pane safely, as cc-rc does for /rc. Ended: the tab shows how to resume it (<span class="mono">asm resume &lt;id&gt;</span>).</span><span class="meta"><span class="pill s-inv">to investigate</span></span></li>
+  <div class="lane cln"><header><h3>2 · Which profile?</h3><small>security</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">2a</span><span class="t">Each profile belongs to its projects</span><span class="d">Claude - LinkedIn → job-applications only · Claude - Facebook → marketplace-seller only · Claude - general → any project. Enforced by the hook.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">2b</span><span class="t">Never your profile</span><span class="d">Your Default profile (Bitwarden) is refused, by the hook and by the file rules.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">2c</span><span class="t">One profile per session</span><span class="d">Once a session picked a profile it can't switch: an honest agent reaches LinkedIn or a general site, never both in one session.</span><span class="meta"><span class="pill s-build">being built</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">2d</span><span class="t">Limit: a malicious agent</span><span class="d">Profiles stop honest mistakes, not an agent that bypasses hooks through the shell. What protects you there: no vault in any agent profile, each job's secrets in its own <span class="mono">~/.config/&lt;agent&gt;/</span>.</span><span class="meta"><span class="pill s-ok">stated</span></span></li>
   </ul></div>
 
-  <div class="lane run"><header><h3>Running Chrome</h3><small>invisible, or visible without stealing focus</small></header><ul>
-    <li class="req" data-s="s-ok"><span class="id">R1</span><span class="t">Headless by default</span><span class="d">Reading, testing, scraping and scheduled jobs use a headless Chrome started by the launcher.</span><span class="meta"><span class="pill s-ok">exists (rule)</span><span class="pill s-proto">enforcement prototyped</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">R2</span><span class="t">Visible only when a human is needed</span><span class="d">A visible tab requires saying what you must do (captcha, login, upload). Otherwise: headless.</span><span class="meta"><span class="pill s-build">to build</span><span class="tag">decision</span></span></li>
-    <li class="req" data-s="s-inv"><span class="id">R3</span><span class="t">Visible windows never take the focus</span><span class="d">Agent windows open behind your work and never come to the front. To test: a separate macOS desktop (Space) for the agent profiles, starting Chrome in the background, minimized windows, scripts that never "activate".</span><span class="meta"><span class="pill s-inv">to investigate</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">R4</span><span class="t">Reuse the same window and tab</span><span class="d">Within a session: one tab, a second one is refused. Across runs: headless Chrome is reused (tested). A new session can't take over another session's Claude in Chrome tab, so it finds it (W10) and closes it before opening its own.</span><span class="meta"><span class="pill s-proto">prototyped</span><span class="tag">limit found</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">R5</span><span class="t">Right profile, never yours</span><span class="d">The hook refuses your Default profile (Bitwarden) and a profile that belongs to another project.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-ok"><span class="id">R6</span><span class="t">Log a headless profile in once</span><span class="d">You log a site in once in a visible window; the headless runs reuse the login.</span><span class="meta"><span class="pill s-ok">exists</span><span class="tag">skill chrome-headless</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">R7</span><span class="t">No visible Chrome started from the shell</span><span class="d">The hook refuses <span class="mono">open -a "Google Chrome"</span> and similar.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+  <div class="lane run"><header><h3>3 · Headless, invisible?</h3><small>your comfort</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">3a</span><span class="t">Headless by default</span><span class="d">Scripts start Chrome only through the kit's launcher: marketplace-seller, robotics-radar, smart-home tests; the password layer is recorded and watched.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">3b</span><span class="t">Visible only with a stated reason</span><span class="d">A Claude in Chrome tab (always visible) needs <span class="mono">--needs-human "what you must do"</span> or <span class="mono">--visible-because "why headless can't"</span>.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">3c</span><span class="t">A killed script never leaves Chrome running</span><span class="d">A watchdog quits the launcher's Chrome when the script that started it dies (a job timeout leaves it today).</span><span class="meta"><span class="pill s-build">being built</span></span></li>
+    <li class="req" data-s="s-inv"><span class="id">3d</span><span class="t">Scheduled jobs on logged-in sites go headless</span><span class="d">Prefer a headless Chrome with its own data folder, logged in once by you (as marketplace-seller does), over a visible profile.</span><span class="meta"><span class="pill s-inv">to discuss</span></span></li>
   </ul></div>
 
-  <div class="lane cln"><header><h3>Cleanup</h3><small>nothing left behind</small></header><ul>
-    <li class="req" data-s="s-proto"><span class="id">K1</span><span class="t">End-of-turn reminder</span><span class="d">If a tab is still open and nobody waits for you, the session is asked once: close it, or say what you must do.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">K2</span><span class="t">Kept tabs expire</span><span class="d">A tab kept for you has a deadline; after it, it closes and the history says so.</span><span class="meta"><span class="pill s-build">to build</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">K3</span><span class="t">chrome-leftovers reads "open now" first</span><span class="d">Who opened each leftover and why, straight from the record; old transcripts only for what has none.</span><span class="meta"><span class="pill s-build">to build</span></span></li>
-    <li class="req" data-s="s-proto"><span class="id">K4</span><span class="t">No orphan Chrome processes</span><span class="d">The launcher closes the Chrome it started and checks it is gone. Test helpers go through it too.</span><span class="meta"><span class="pill s-proto">prototyped</span></span></li>
+  <div class="lane run"><header><h3>4 · If visible: which window?</h3><small>your comfort</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">4a</span><span class="t">Ask what is open first</span><span class="d"><span class="mono">chrome-claim open</span>: the tabs open for my project, by any session or job; one tab per session.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">4b</span><span class="t">A job never piles up windows</span><span class="d">auto-job-apply closes its old tab nobody waits on, and never opens a second tab for a job still waiting on you.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-inv"><span class="id">4c</span><span class="t">One agent window per project</span><span class="d">Every session of a project puts its tab in that project's agent window; a new window only if none exists. Your own windows are never touched. Being tested: can Claude in Chrome put a session's tabs in an existing window?</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
+  </ul></div>
+
+  <div class="lane run"><header><h3>5 · If visible: focus?</h3><small>your comfort</small></header><ul>
+    <li class="req" data-s="s-inv"><span class="id">5a</span><span class="t">Never take focus</span><span class="d">An agent window opens and works in the background, never in front of what you are typing.</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
+    <li class="req" data-s="s-inv"><span class="id">5b</span><span class="t">On the project's desktop</span><span class="d">Each project's agent window lives on that project's macOS desktop (you have 4). Being tested: Hammerspoon moving a window to a desktop.</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
+    <li class="req" data-s="s-inv"><span class="id">5c</span><span class="t">The kit opens a missing profile itself</span><span class="d">In the background, on the right desktop, instead of asking you; replaces the job-applications-only exception.</span><span class="meta"><span class="pill s-inv">being tested</span></span></li>
+  </ul></div>
+
+  <div class="lane vis"><header><h3>Who opened what</h3><small>for you and for agents</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">W1</span><span class="t">Every tab carries its facts</span><span class="d">Opened at, the Claude session's UUID, the project (+ the job), the reason, "YOUR TURN: …" in red. 30 px bar that pushes the page down; badge ! / AI / ✓; quiet on LinkedIn and Facebook unless you must act.</span><span class="meta"><span class="pill s-ok">built</span><span class="tag">your "Load unpacked" pending</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">W2</span><span class="t">Recorded without the agent's goodwill</span><span class="d">The hook records every open, navigation and close (also tabs you close); scheduled jobs and scripts too.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">W3</span><span class="t">You ask: chrome-who</span><span class="d">Every open agent tab and Chrome; <span class="mono">--since 7d</span> for the history; BLIND when two Chromes confuse macOS scripts.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+  </ul></div>
+
+  <div class="lane com"><header><h3>Talking to the agent</h3><small>from the tab</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">C1</span><span class="t">Comment box in the side panel</span><span class="d">Your message reaches the session that opened the tab at its next step; it answers on the tab. Claude in Chrome's own chat was ruled out: it talks to a separate Claude.</span><span class="meta"><span class="pill s-ok">built</span></span></li>
+    <li class="req" data-s="s-inv"><span class="id">C2</span><span class="t">Reach an idle or ended session</span><span class="d">Idle: type into its tmux pane safely. Ended: the tab shows how to resume it.</span><span class="meta"><span class="pill s-inv">later</span></span></li>
+  </ul></div>
+
+  <div class="lane log"><header><h3>Cleanup</h3><small>nothing left behind</small></header><ul>
+    <li class="req" data-s="s-ok"><span class="id">K1</span><span class="t">End-of-turn reminder</span><span class="d">A tab left open with nobody waiting: the session is asked once to close it or say what you must do.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">K2</span><span class="t">chrome-leftovers starts from the record</span><span class="d">Who opened each leftover and why; old transcripts only for what has no record.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
+    <li class="req" data-s="s-build"><span class="id">K3</span><span class="t">Kept tabs expire</span><span class="d">A tab kept for you closes after a deadline (auto-job-apply: 2 h); the kit would do it for every project.</span><span class="meta"><span class="pill s-build">later</span></span></li>
   </ul></div>
 
   </div>
@@ -328,10 +335,10 @@ footer{color:var(--muted);font-size:12.5px}
   <div class="eyebrow">Projects</div>
   <h2>Who uses Chrome, and what each needs</h2>
   <div class="tablebox"><table class="wide">
-    <thead><tr><th>Project</th><th>How it uses Chrome</th><th>Profile</th><th>Runs</th><th>Needs from the kit</th></tr></thead>
+    <thead><tr><th>Project</th><th>How it uses Chrome</th><th>Profile</th><th>Runs</th><th>On the kit</th></tr></thead>
     <tbody>
-      <tr><td class="proj"><span class="dot" style="background:var(--cln)"></span>job-applications · auto-job-apply</td><td class="how">Agent SDK + Claude in Chrome</td><td>Claude - auto-job-apply</td><td>scheduled (job-runner)</td><td>W9 hook in SDK · W2 your-turn bar · W10 reuse/close old tab · W12 · C1</td></tr>
-      <tr><td class="proj"><span class="dot" style="background:var(--vis)"></span>skills: linkedin, linkedin-profile, job-room-work-efforts</td><td class="how">Claude in Chrome, by hand</td><td>auto-job-apply / general</td><td>by hand</td><td>W6 hook · W1 facts on tab · K1 · R5</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--cln)"></span>job-applications · auto-job-apply</td><td class="how">Agent SDK + Claude in Chrome</td><td>Claude - LinkedIn</td><td>scheduled (job-runner)</td><td>W9 hook in SDK · W2 your-turn bar · W10 reuse/close old tab · W12 · C1</td></tr>
+      <tr><td class="proj"><span class="dot" style="background:var(--vis)"></span>skills: linkedin, linkedin-profile, job-room-work-efforts</td><td class="how">Claude in Chrome, by hand</td><td>LinkedIn / general</td><td>by hand</td><td>W6 hook · W1 facts on tab · K1 · R5</td></tr>
       <tr><td class="proj"><span class="dot" style="background:var(--com)"></span>skill whatsapp</td><td class="how">Claude in Chrome on WhatsApp Web</td><td>Claude - general</td><td>by hand</td><td>W6 · R3 no focus · W1</td></tr>
       <tr><td class="proj"><span class="dot" style="background:var(--run)"></span>marketplace-seller</td><td class="how">headless Playwright, own data folder; Claude in Chrome for Facebook</td><td>Claude - Facebook + own folder</td><td>by hand / jobs</td><td>W8 launcher · R4 reuse · W5 quiet on Facebook</td></tr>
       <tr><td class="proj"><span class="dot" style="background:var(--log)"></span>robotics-radar</td><td class="how">headless Chrome</td><td>own folder</td><td>scheduled</td><td>W8 launcher · K4</td></tr>
@@ -348,26 +355,28 @@ footer{color:var(--muted);font-size:12.5px}
     <div class="eyebrow">Rollout</div>
     <h2>Order of work</h2>
     <ol class="phases">
-      <li><b>The kit in my-setup.</b> Hook, <span class="mono">chrome-claim</span>, <span class="mono">chrome-who</span>, launcher, the two files; installed by my-setup; tests.</li>
-      <li><b>Extension in the 3 agent profiles.</b> Installer + one "Load unpacked" by you in each profile.</li>
-      <li><b>Rules.</b> One CLAUDE.md line; skills chrome-headless and chrome-leftovers rewritten on top of the kit.</li>
-      <li><b>job-applications.</b> SDK sessions go through the hook; "your turn" on the tab; reuse or close the old tab.</li>
-      <li><b>Scripts.</b> marketplace-seller, robotics-radar, smart-home, trading-bot, secrets-and-account-migration start Chrome through the launcher.</li>
-      <li><b>Investigations.</b> Windows that never take focus (R3), idle sessions (C4).</li>
+      <li><span class="pill s-ok">done 1 Nov</span> <b>The kit in my-setup.</b> Hook, <span class="mono">chrome-claim</span>, <span class="mono">chrome-who</span>, launcher, record.</li>
+      <li><span class="pill s-ok">built 1 Nov</span> <b>Extension "Agent tab notes".</b> Waiting on your "Load unpacked" in each agent profile.</li>
+      <li><span class="pill s-ok">done 1 Nov</span> <b>Rules.</b> CLAUDE.md paragraph; skills chrome-headless and chrome-leftovers.</li>
+      <li><span class="pill s-ok">done 1 Nov</span> <b>job-applications.</b> Recorded, "YOUR TURN" on a kept tab, no duplicates, BLIND.</li>
+      <li><span class="pill s-ok">done 1 Nov</span> <b>Scripts.</b> marketplace-seller, robotics-radar, smart-home, password layer; trading-bot's render no longer quits every Chrome.</li>
+      <li><span class="pill s-build">being built</span> <b>Kit fixes.</b> One profile per session (2c), watchdog (3c), extra Chrome options, busy data folder, a false refusal on text that only mentions Chrome.</li>
+      <li><span class="pill s-inv">being tested</span> <b>Questions 4 and 5.</b> One agent window per project, never in front, on the project's desktop.</li>
     </ol>
   </div>
   <div class="card">
-    <div class="eyebrow">Waiting on you</div>
+    <div class="eyebrow">Decided by you</div>
     <h2>Decisions</h2>
-    <div class="dec"><span class="q">Visible tab only with a stated "your turn" reason (R2)</span><span class="pick">pick: yes</span><span class="why">Otherwise any reason is enough to open a visible tab.</span></div>
-    <div class="dec"><span class="q">One tab per session (R4)</span><span class="pick">pick: yes</span><span class="why">A second tab is refused with "reuse tab N".</span></div>
-    <div class="dec"><span class="q">End-of-turn reminder (K1)</span><span class="pick">pick: yes</span><span class="why">Costs one extra model turn when a tab is left open.</span></div>
-    <div class="dec"><span class="q">Add the CLAUDE.md line (C3)</span><span class="pick">pick: yes</span><span class="why">Without it agents ignored your messages in the test.</span></div>
-    <div class="dec"><span class="q">my-setup installs the hooks</span><span class="pick">pick: yes</span><span class="why">Today agent-session-manager owns the hooks section; both keep their own entries.</span></div>
+    <div class="dec"><span class="q">Visible tab only with a stated reason</span><span class="pick">yes</span><span class="why">--needs-human or --visible-because.</span></div>
+    <div class="dec"><span class="q">One tab per session</span><span class="pick">yes</span></div>
+    <div class="dec"><span class="q">End-of-turn reminder</span><span class="pick">yes</span></div>
+    <div class="dec"><span class="q">Keep separate profiles (honest-mistake boundary)</span><span class="pick">yes</span><span class="why">Not one shared profile.</span></div>
+    <div class="dec"><span class="q">Your window + one agent window per project</span><span class="pick">yes</span><span class="why">Option B; being tested.</span></div>
+    <div class="dec"><span class="q">Alerts to you</span><span class="pick">out of scope</span><span class="why">Each agent decides; the kit only gives it the facts.</span></div>
   </div>
 </section>
 
-<footer>Sources: prototypes and tests in <span class="mono">/Users/jeanlescut/dev/my-setup/doc/chrome-visibility/</span> (observability/, on-page-note/), the job-applications session's findings of 1 Nov 2026. Nothing is installed yet.</footer>
+<footer>Sources: prototypes and tests in <span class="mono">/Users/jeanlescut/dev/my-setup/doc/chrome-visibility/</span> (observability/, on-page-note/), the job-applications session's findings of 1 Nov 2026. Installed since 1 Nov 2026.</footer>
 </div>
 
 <script>

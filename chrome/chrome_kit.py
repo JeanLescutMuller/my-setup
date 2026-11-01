@@ -56,6 +56,7 @@ D_DEVICE = {
     '331a94e7-f123-4e09-a755-cdc63980187f': ('Claude - general', None),
     'f16617c3-d0dc-425b-a7a4-d925eec10bf5': ('Claude - LinkedIn', ('/dev/job-applications', '/opt/job-applications')),
     'db5922d3-1713-4df0-a025-1ac608fac5f1': ('Claude - Facebook', ('/dev/marketplace-seller', '/opt/marketplace-seller')),
+    'aeb98e0d-7abb-4b30-88be-b700e160d76e': ('Claude - Bybit & Oxylabs', ('/dev/trading-bot', '/opt/trading-bot')),
 }
 # Chrome's top-level "Local State" (not inside a profile folder: profile folders are never read): profile names -> folders
 LOCAL_STATE = Path(os.environ.get('CHROME_LOCAL_STATE') or Path.home() / 'Library/Application Support/Google/Chrome/Local State')

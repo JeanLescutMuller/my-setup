@@ -110,6 +110,7 @@ Before the first browser action of a session, `select_browser` by deviceId (the 
 | Claude - general | `331a94e7-f123-4e09-a755-cdc63980187f` | everything by default (not logged in to LinkedIn since 2026-10-19); signed in to WhatsApp Web since 2026-10-21 (skill `whatsapp`) |
 | Claude - LinkedIn (named "Claude - auto-job-apply" until 2026-11-01, user) | `f16617c3-d0dc-425b-a7a4-d925eec10bf5` | only `~/dev/job-applications` (auto-job-apply, LinkedIn): logged in to LinkedIn, not to Google; never anything else (user, 2026-10-19) |
 | Claude - Facebook | `db5922d3-1713-4df0-a025-1ac608fac5f1` | only Facebook Marketplace for `~/dev/marketplace-seller` (logged in to the user's secondary Facebook account); never anything else, and nothing else ever uses Facebook |
+| Claude - Bybit & Oxylabs | `aeb98e0d-7abb-4b30-88be-b700e160d76e` | only `~/dev/trading-bot` (logged in to the Oxylabs dashboard, 2026-11-01; Bybit to come); never anything else, and nothing else ever uses Bybit or Oxylabs (user, 2026-11-01) |
 
 If a deviceId is missing from `list_connected_browsers`, run `agent-chrome open-profile-window` and check again; if still missing, ask the user; never pick another browser yourself. One profile per session: the hook refuses a second one.
 

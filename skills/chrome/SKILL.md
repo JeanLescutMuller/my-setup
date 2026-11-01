@@ -39,6 +39,7 @@ Yes, unless a human must act or only a logged-in visible profile can do it:
 ```
 need a browser
  ├─ to SHOW the user something, or a site only the visible logged-in profile can reach
+ │  (also auto-job-apply's scheduled runs: built on Claude in Chrome, visible, never in front)
  │      → Claude in Chrome, right profile, ONE tab (questions 4 and 5)
  └─ anything else: read a page, test, scrape, fill and submit forms, scheduled jobs, every test run
         → a headless Chrome started by your script through the launcher (below)

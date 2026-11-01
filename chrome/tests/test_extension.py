@@ -230,8 +230,21 @@ def main():
             page.screenshot(path=str(SHOTS / 'ext_bar_before.png'))
             kit.record([{'event': 'open', 'tab_id': tid, 'url': f'{base}/apply', 'profile': 'Claude - LinkedIn',
                          'device_id': GEN}], {'session_id': SID, 'cwd': str(PROJ)})
-            claim('authorize-tab', 'Apply to job 4312 (Data Engineer, Zurich)', '--needs-human', 'solve the captcha')
+            claim('authorize-tab', 'Apply to job 4312 (Data Engineer, Zurich)', '--visibility', 'focused',
+                  '--visibility-reason', 'the human solves a captcha', '--project', 'job-applications')
+            active = lambda t: ctl.evaluate(f'chrome.tabs.get({t}).then(t => t.active)')
+            other = ctx.new_page()            # the human is elsewhere: another tab in front
+            other.goto(f'{base}/job')
             time.sleep(2)
+            check('focused, no need yet: the tab is not brought to the front', not active(tid))
+            claim('mark-as-needing-human', 'solve the captcha')
+            time.sleep(2)
+            check('focused + mark-as-needing-human: the tab is brought to the front', active(tid))
+            other.bring_to_front()
+            time.sleep(2)
+            check('brought to the front once: the human moved away, it stays behind', not active(tid))
+            other.close()
+            time.sleep(1)
             txt = bar_text(page)
             opened = kit.read_open()[str(tid)]['opened_ts']
             day = time.strftime('%d', time.localtime(opened))
@@ -264,6 +277,9 @@ def main():
             sp.set_viewport_size({'width': 380, 'height': 640})
             sp.goto(f'chrome-extension://{EXT_ID}/sidepanel.html?tabId={tid}')
             time.sleep(1)
+            body = sp.inner_text('body')
+            check('side panel details: visibility and why that visibility', 'why that visibility' in body and 'focused' in body
+                  and 'the human solves a captcha' in body, body[:300])
             sp.fill('#text', 'Captcha solved, go on')
             sp.click('button')
             time.sleep(1.5)

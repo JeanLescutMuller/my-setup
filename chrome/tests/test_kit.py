@@ -31,8 +31,9 @@ def hook(event, tool='', d_input=None, response=None, cwd=CWD, **kw):
     return json.loads(r.stdout) if r.stdout.strip() else {}
 
 
-def cli(name, *args):
-    return subprocess.run([sys.executable, '-IB', str(KIT / name), *args], capture_output=True, text=True, env=ENV, cwd=CWD)
+def cli(name, *args, cwd=CWD, **env):
+    return subprocess.run([sys.executable, '-IB', str(KIT / name), *args], capture_output=True, text=True,
+                          env={**ENV, **env}, cwd=cwd)
 
 
 def check(name, ok):
@@ -84,21 +85,31 @@ d = hook('PreToolUse', C + 'select_browser', {'deviceId': GEN}, session_id='sess
 check('switch_browser fixes the profile when its answer names it', decision(d) == 'deny' and 'Claude - LinkedIn' in reason(d))
 # A reason before anything opens; a visible reason before a new tab
 d = hook('PreToolUse', C + 'tabs_create_mcp')
-check('tabs_create refused before a claim, explaining both options', decision(d) == 'deny' and '--needs-human' in reason(d) and '--visible-because' in reason(d))
+check('tabs_create refused before an authorization, explaining it', decision(d) == 'deny' and 'authorize-tab' in reason(d) and '--visibility' in reason(d) and 'mark-as-needing-human' in reason(d))
 check('navigate refused before a claim too', decision(hook('PreToolUse', C + 'navigate', {'url': 'https://x.ch', 'tabId': 1})) == 'deny')
 check('reading tools never refused', decision(hook('PreToolUse', C + 'tabs_context_mcp')) is None)
-r = cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers')
-check('authorize-tab without --needs-human or --visible-because refused, naming both', r.returncode != 0 and '--visible-because' in r.stderr and '--needs-human' in r.stderr)
+r = cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers', '--project', 'proj-x')
+check('authorize-tab without --visibility and its reason refused, naming them', r.returncode != 0 and '--visibility' in r.stderr and '--visibility-reason' in r.stderr)
+r = cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers', '--visibility', 'unfocused', '--visibility-reason', 'r')
+check('authorize-tab outside ~/dev/<repo> without --project refused, saying it is required', r.returncode != 0 and '--project is required' in r.stderr)
+r = cli('agent_chrome.py', 'authorize-tab', 'x', '--visibility', 'unfocused', '--visibility-reason', 'r', '--project', 'other', cwd='/Users/jeanlescut/dev/my-setup')
+check('authorize-tab inside ~/dev/my-setup with --project other refused', r.returncode != 0 and 'project my-setup' in r.stderr)
+r = cli('agent_chrome.py', 'authorize-tab', 'x', '--visibility', 'unfocused', '--visibility-reason', 'r', cwd='/Users/jeanlescut/dev/my-setup/chrome', CLAUDE_CODE_SESSION_ID='sess-R')
+check('authorize-tab inside ~/dev/my-setup/chrome: project my-setup by default', r.returncode == 0 and json.loads((tmp / 'state/sessions/sess-R.json').read_text())['project'] == 'my-setup')
+r = cli('agent_chrome.py', 'mark-as-human-done', CLAUDE_CODE_SESSION_ID='')
+check('no $CLAUDE_CODE_SESSION_ID: the session subcommands refuse, saying so', r.returncode != 0 and 'run this inside a Claude Code session ($CLAUDE_CODE_SESSION_ID is not set)' in r.stderr)
+check('--session no longer exists', cli('agent_chrome.py', 'mark-as-human-done', '--session', 'x').returncode != 0)
 r = cli('chrome_claim.py', '--purpose', 'find Amazon RIVR engineers')
-check('old chrome-claim --purpose alone: still refused, explaining both options', r.returncode != 0 and '--visible-because' in r.stderr and '--needs-human' in r.stderr)
-check('authorize-tab --visible-because accepted', cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers', '--visible-because', 'LinkedIn needs the logged-in profile').returncode == 0)
+check('old chrome-claim --purpose alone: still refused, explaining the new options', r.returncode != 0 and '--visibility' in r.stderr)
+check('authorize-tab --visibility unfocused accepted', cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers', '--visibility', 'unfocused',
+                                                           '--visibility-reason', 'LinkedIn needs the logged-in profile', '--project', 'proj-x').returncode == 0)
 check('tabs_create allowed after the claim', decision(hook('PreToolUse', C + 'tabs_create_mcp')) is None)
 d = hook('PostToolUse', C + 'tabs_create_mcp', {}, [{'type': 'text', 'text': f'Created new tab. Tab ID: {T}'}] + tabs((T, 'New tab', '')))
 e = opened().get(str(T), {})
-check('open.json entry: fields in order', list(e) == ['ts', 'dt', 'opened_ts', 'opened_dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'needs_human', 'message', 'reply_to'])
+check('open.json entry: fields in order', list(e) == ['ts', 'dt', 'opened_ts', 'opened_dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'message', 'reply_to'])
 check('open.json entry: session UUID, project = git toplevel, profile, purpose, no job', e.get('session_id') == 'sess-A' and e.get('project') == 'proj-x'
       and e.get('profile') == 'Claude - general' and e.get('purpose') == 'find Amazon RIVR engineers' and e.get('job') is None and e.get('reply_to', '').endswith('asm resume sess-A'))
-check('history line: fields in order, ts first', list(history()[-1]) == ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'needs_human', 'message', 'reply_to'])
+check('history line: fields in order, ts first', list(history()[-1]) == ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'message', 'reply_to'])
 check('Claude is told the tab was recorded', 'recorded' in ctx(d))
 d = hook('PreToolUse', C + 'tabs_create_mcp')
 check('second tab refused: reuse tab N', decision(d) == 'deny' and f'tab {T}' in reason(d))
@@ -150,8 +161,15 @@ check('mark-as-human-done: needs_human cleared on the tab', opened()[str(T)]['ne
 hook('PostToolUse', C + 'tabs_close_mcp', {'tabId': T}, [{'type': 'text', 'text': f'Closed tab {T}. 0 tab(s) remain.'}])
 check('close: entry removed, close line in the history', str(T) not in opened() and history()[-1]['event'] == 'close')
 check('Stop allowed once tabs are closed', hook('Stop', stop_hook_active=False) == {})
-r = cli('chrome_claim.py', '--session', 'sess-old', '--purpose', 'old', '--needs-human', 'x')
-check('old chrome-claim --purpose --needs-human: works, notice names authorize-tab', r.returncode == 0 and 'renamed: agent-chrome authorize-tab' in r.stderr)
+r = cli('chrome_claim.py', '--purpose', 'old', '--needs-human', 'x', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-old')
+d_old = json.loads((tmp / 'state/sessions/sess-old.json').read_text())
+check('old chrome-claim --purpose --needs-human: authorize-tab unfocused, then mark-as-needing-human', r.returncode == 0
+      and 'renamed: agent-chrome authorize-tab' in r.stderr and 'renamed: agent-chrome mark-as-needing-human' in r.stderr
+      and d_old['visibility'] == 'unfocused' and d_old['needs_human'] == 'x')
+r = cli('chrome_claim.py', '--purpose', 'old2', '--visible-because', 'WhatsApp needs the profile', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-old2')
+d_old = json.loads((tmp / 'state/sessions/sess-old2.json').read_text())
+check('old chrome-claim --visible-because Y: --visibility unfocused --visibility-reason Y', r.returncode == 0
+      and d_old['visibility'] == 'unfocused' and d_old['visibility_reason'] == 'WhatsApp needs the profile')
 subprocess.run([sys.executable, '-IB', '-c', f'import sys; sys.path.insert(0, {str(KIT)!r}); import chrome_kit as k; '
                 'k.record([{"event": "open", "ts": 1000, "tab_id": 7, "device_id": "' + GEN + '", "url": "https://old"}], {"session_id": "sess-old", "cwd": "/tmp"}); '
                 'k.record([{"event": "open", "tab_id": "ABC", "profile": "headless:/nowhere", "url": "https://h"}], {"session_id": "sess-old", "cwd": "/tmp"})'], env=ENV)
@@ -172,12 +190,47 @@ check('status --since 1d: the history', 'navigate' in cli('agent_chrome.py', 'st
 r = cli('agent_chrome.py', '--help')
 check('agent-chrome --help names the 6 subcommands', all(x in r.stdout for x in ['authorize-tab', 'mark-as-needing-human',
       'mark-as-human-done', 'reply-to-human', 'status', 'open-profile-window']))
-# A job without Bash says why in its environment; a new tab still needs a visible reason
+# Visibility: invisible refuses every Claude in Chrome page; focused is recorded on the tab (the extension acts on it)
+cli('agent_chrome.py', 'authorize-tab', 'scrape the menu', '--visibility', 'invisible', '--visibility-reason', 'a public page', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-I')
+for t, inp in [('tabs_create_mcp', {}), ('navigate', {'url': 'https://x.ch', 'tabId': 5}), ('tabs_context_mcp', {'createIfEmpty': True})]:
+    d = hook('PreToolUse', C + t, inp, session_id='sess-I')
+    check(f'invisible: {t} refused, pointing to the launcher and to --visibility unfocused', decision(d) == 'deny' and 'launcher' in reason(d) and '--visibility unfocused' in reason(d))
+check('invisible: reading tools still allowed', decision(hook('PreToolUse', C + 'tabs_context_mcp', session_id='sess-I')) is None)
+cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'focused', '--visibility-reason', 'the human uploads a file', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-F')
+hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'ok'}], session_id='sess-F')
+hook('PostToolUse', C + 'tabs_create_mcp', {}, tabs((555, 'New tab', '')), session_id='sess-F')
+r = cli('agent_chrome.py', 'mark-as-needing-human', 'upload CV.pdf', CLAUDE_CODE_SESSION_ID='sess-F')
+e = opened().get('555', {})
+check('focused: the tab entry carries visibility focused, its reason and the need (the extension brings it to the front)',
+      e.get('visibility') == 'focused' and e.get('visibility_reason') == 'the human uploads a file' and e.get('needs_human') == 'upload CV.pdf' and 'front' in r.stdout)
+r = cli('agent_chrome.py', 'status')
+check('status shows visibility and its reason', 'visibility' in r.stdout and 'focused' in r.stdout and 'the human uploads a file' in r.stdout)
+# The authorized project: the profile check and status --mine use it
+cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'LinkedIn login', '--project', 'job-applications', CLAUDE_CODE_SESSION_ID='sess-P')
+check('profile check uses the authorized project: LinkedIn allowed for job-applications from another folder',
+      decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, session_id='sess-P')) is None)
+check('profile check uses the authorized project: LinkedIn refused for proj-x even from ~/dev/job-applications',
+      decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, cwd='/Users/jeanlescut/dev/job-applications', session_id='sess-F')) == 'deny')
+check('status --mine uses the authorized project', 'project job-applications' in cli('agent_chrome.py', 'status', '--mine', CLAUDE_CODE_SESSION_ID='sess-P').stdout)
+# A job without Bash says why in its environment (CHROME_PURPOSE), how visible (CHROME_VISIBILITY, default unfocused) and why
 ENV['CHROME_PURPOSE'] = 'auto-job-apply: apply to 3 jobs'
 d = hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-J')
-check('$CHROME_PURPOSE alone: claim recorded, new tab refused (no visible reason)', decision(d) == 'deny' and 'visible' in reason(d) and history()[-1]['purpose'] == 'auto-job-apply: apply to 3 jobs')
+check('$CHROME_PURPOSE alone: claim recorded, new tab refused (no visibility reason), naming CHROME_VISIBILITY_REASON',
+      decision(d) == 'deny' and 'CHROME_VISIBILITY_REASON' in reason(d) and history()[-1]['purpose'] == 'auto-job-apply: apply to 3 jobs')
 ENV['CHROME_VISIBLE_BECAUSE'] = 'the job applies through the logged-in LinkedIn profile'
-check('$CHROME_PURPOSE + $CHROME_VISIBLE_BECAUSE: allowed', decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-K')) is None)
+check('$CHROME_PURPOSE + $CHROME_VISIBLE_BECAUSE (old name, until 2026-11-08): allowed, unfocused',
+      decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-K')) is None and history()[-1]['visibility'] == 'unfocused'
+      and history()[-1]['visibility_reason'] == 'the job applies through the logged-in LinkedIn profile')
+del ENV['CHROME_VISIBLE_BECAUSE']
+ENV.update(CHROME_VISIBILITY='focused', CHROME_VISIBILITY_REASON='the human may solve a captcha')
+check('$CHROME_VISIBILITY + $CHROME_VISIBILITY_REASON: allowed, recorded', decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-K2')) is None
+      and history()[-1]['visibility'] == 'focused' and history()[-1]['visibility_reason'] == 'the human may solve a captcha')
+ENV['CHROME_VISIBILITY'] = 'invisible'
+check('$CHROME_VISIBILITY=invisible: Claude in Chrome refused', decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-K3')) == 'deny')
+ENV['CHROME_VISIBILITY'] = 'loud'
+check('$CHROME_VISIBILITY not a level: refused, naming the levels', 'invisible, unfocused, focused' in reason(hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-K4')))
+for k in ('CHROME_PURPOSE', 'CHROME_VISIBILITY', 'CHROME_VISIBILITY_REASON'):
+    del ENV[k]
 # Shell launches of a visible Chrome
 for cmd, want in [('open -na "Google Chrome" --args --profile-directory="Profile 3"', 'deny'),
                   ('open -a "Google Chrome"', 'deny'), ('cd x && open -na "Google Chrome" --args --new-window', 'deny'),

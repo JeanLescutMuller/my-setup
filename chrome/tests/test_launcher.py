@@ -78,5 +78,27 @@ r = subprocess.run([sys.executable, '-IB', str(KIT / 'launch_headless.py'), '--d
                    capture_output=True, text=True, env={**ENV, 'CHROME_TEST_PS': str(tmp / 'ps.txt')}, timeout=60)
 check('busy data folder (a visible Chrome on it) refused, clearly', r.returncode != 0 and 'already used by a visible Chrome (pid 999)' in r.stderr
       and not subprocess.run(['pgrep', '-f', f'user-data-dir={busy_dir}'], capture_output=True, text=True).stdout)
+
+# Inside a Claude session: only after `agent-chrome authorize-tab … --visibility invisible`
+S = {**ENV, 'CLAUDE_CODE_SESSION_ID': 'sess-H'}
+S.pop('JR_JOB', None)
+
+
+def in_session(*args):
+    return subprocess.run([sys.executable, '-IB', *args], capture_output=True, text=True, env=S, timeout=90, cwd=str(tmp))
+
+
+r = in_session(str(KIT / 'launch_headless.py'), '--data-dir', str(prof), '--purpose', 'in a session')
+check('inside a session with no authorization: refused, saying how, no Chrome started',
+      r.returncode != 0 and 'has not authorized an invisible Chrome' in r.stderr and '--visibility invisible' in r.stderr and not alive())
+in_session(str(KIT / 'agent_chrome.py'), 'authorize-tab', 'read a page', '--visibility', 'unfocused', '--visibility-reason', 'x', '--project', 'p')
+r = in_session(str(KIT / 'launch_headless.py'), '--data-dir', str(prof), '--purpose', 'in a session')
+check('inside a session authorized unfocused: refused, naming it', r.returncode != 0 and 'it authorized unfocused' in r.stderr and not alive())
+in_session(str(KIT / 'agent_chrome.py'), 'authorize-tab', 'read a page', '--visibility', 'invisible', '--visibility-reason', 'a public page', '--project', 'p')
+r = in_session(str(KIT / 'launch_headless.py'), '--data-dir', str(prof), '--purpose', 'in a session')
+hist = [json.loads(x) for f in (tmp / 'state/history').glob('*.jsonl') for x in f.read_text().splitlines()]
+check('inside a session authorized invisible: started and closed, recorded with its project and visibility',
+      r.returncode == 0 and not alive() and any(h['event'] == 'open' and h['session_id'] == 'sess-H' and h['project'] == 'p'
+                                                and h['visibility'] == 'invisible' for h in hist))
 print(f'{n_fail} failed; folder: {tmp}')
 sys.exit(bool(n_fail))

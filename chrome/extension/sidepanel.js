@@ -6,7 +6,8 @@ const tabId = Number(new URLSearchParams(location.search).get("tabId"));
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const hhmm = ts => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const ROWS = [["opened_dt", "opened (UTC)"], ["session_id", "session"], ["project", "project"], ["job", "scheduled job"],
-              ["purpose", "why"], ["needs_human", "needs human"], ["reply_to", "reach it"], ["dt", "last event (UTC)"],
+              ["purpose", "why"], ["visibility", "visibility"], ["visibility_reason", "why that visibility"],
+              ["needs_human", "needs human"], ["reply_to", "reach it"], ["dt", "last event (UTC)"],
               ["event", "last event"], ["machine", "machine"], ["cwd", "folder"], ["profile", "Chrome profile"], ["url", "url"]];
 let shown = "";
 async function draw() {

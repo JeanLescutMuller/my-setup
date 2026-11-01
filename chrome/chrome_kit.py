@@ -6,11 +6,11 @@ Kept in $CHROME_STATE (default ~/opt/my-setup/state/chrome/; tests set a scratch
                          start, or headless ones whose Chrome is gone, are dropped (correct()).
   history/YYYY-MM.jsonl  every event, append only, one file per month (UTC).
   comments.jsonl         the user's comments typed on a tab (written by the extension): ts, dt, session_id, tab_id, url, text.
-  sessions/<id>.json     per Claude session: its claim (purpose, needs_human, visible_because), the browser it
-                         selected, how far its comments were read. Internal to the kit.
+  sessions/<id>.json     per Claude session: its authorization (purpose, project, visibility, visibility_reason),
+                         needs_human, the browser it selected, how far its comments were read. Internal to the kit.
 Fields, in this order: ts, dt, [opened_ts, opened_dt: open.json only], event (open|navigate|claim|needs_human|done|
-message|close), session_id, project, job, machine, cwd, profile, device_id, tab_id, url, purpose, needs_human,
-message, reply_to. Headless tabs: profile "headless:<data folder>", tab_id = the CDP target id, device_id null; a
+message|close|window), session_id, project, job, machine, cwd, profile, device_id, tab_id, url, purpose, visibility
+(invisible|unfocused|focused), visibility_reason, needs_human, message, reply_to. Headless tabs: profile "headless:<data folder>", tab_id = the CDP target id, device_id null; a
 visible Chrome a script records itself (secrets-and-account-migration's pwlayer): profile "visible:<data folder>".
 Python 3.9+ (macOS's /usr/bin/python3), standard library only.
 """
@@ -30,7 +30,8 @@ from pathlib import Path
 STATE = Path(os.environ.get('CHROME_STATE') or Path.home() / 'opt/my-setup/state/chrome')
 OPEN, HISTORY, COMMENTS, SESSIONS = STATE / 'open.json', STATE / 'history', STATE / 'comments.jsonl', STATE / 'sessions'
 FIELDS = ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id',
-          'url', 'purpose', 'needs_human', 'message', 'reply_to']
+          'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'message', 'reply_to']
+VISIBILITIES = ('invisible', 'unfocused', 'focused')  # authorize-tab --visibility: what the hook lets the session do
 FIELDS_OPEN = FIELDS[:2] + ['opened_ts', 'opened_dt'] + FIELDS[2:]
 RE_CHROME_MAIN = re.compile(r'MacOS/Google Chrome( |$)')
 # deviceId -> (profile name, folders of the only projects allowed to use it, or None = any): AGENTS_LOCAL.md "Chrome profiles"
@@ -56,6 +57,25 @@ def machine_name() -> str:
     if not re.fullmatch(r"[A-Za-z0-9-]+", name):
         raise RuntimeError("no machine name: macOS sudo scutil --set HostName <name>; Linux sudo hostnamectl set-hostname <name>")
     return name
+
+
+def repo_of(cwd: str) -> str | None:
+    """<repo> when cwd is inside ~/dev/<repo> or ~/opt/<repo> (the folder as given, or resolved: ~/dev/my-context is a
+    link), else None."""
+    for c in {cwd or '', str(Path(cwd or '.').resolve())}:
+        for base in (Path.home() / 'dev', Path.home() / 'opt'):
+            try:
+                parts = Path(c).relative_to(base).parts
+            except ValueError:
+                continue
+            if parts:
+                return parts[0]
+    return None
+
+
+def projects_of(l_ok) -> set:
+    """The project names of a profile's allowed folders ('/dev/job-applications' -> 'job-applications')."""
+    return {Path(x).name for x in l_ok or ()}
 
 
 def project_of(cwd: str) -> str:
@@ -164,9 +184,11 @@ def update_session(sid: str, **kw) -> dict:
     return d
 
 
-def profile_for(cwd: str) -> str:
-    """The agent profile of a project folder: the one reserved for it (LinkedIn, Facebook), else "Claude - general"."""
-    return next((n for n, l_ok in D_DEVICE.values() if l_ok and any(x in cwd for x in l_ok)), 'Claude - general')
+def profile_for(cwd: str, project: str | None = None) -> str:
+    """The agent profile of a project (else of a folder): the one reserved for it (LinkedIn, Facebook), else
+    "Claude - general"."""
+    return next((n for n, l_ok in D_DEVICE.values() if l_ok and (project in projects_of(l_ok) if project
+                 else any(x in cwd for x in l_ok))), 'Claude - general')
 
 
 def profile_folders() -> dict:

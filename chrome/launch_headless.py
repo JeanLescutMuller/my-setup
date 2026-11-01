@@ -12,6 +12,8 @@ chrome). It records every tab like the hook does, and reuses what the previous r
   job-runner timeout KILL, which Chrome, in its own session too, also escapes) quits Chrome, checks it is gone and
   records the close as soon as the caller's pid is gone. Model: secrets-and-account-migration's pwlayer.py `_watch`.
 - flags: extra Chrome flags (e.g. ['--disk-cache-size=1']).
+- Inside a Claude Code session ($CLAUDE_CODE_SESSION_ID set), the session must have run `agent-chrome authorize-tab
+  … --visibility invisible` first (PermissionError otherwise); outside one (scheduled jobs, by hand), `purpose` says why.
 - A data folder a visible Chrome (not this launcher's) already uses is refused: a second Chrome on it would hand
   its work to that one, in a window.
 Only the standard library (CDP's HTTP endpoints); a caller attaches Playwright to `http://127.0.0.1:<port>` itself.
@@ -130,11 +132,20 @@ def watch():
 @contextlib.contextmanager
 def headless(data_dir: Path, purpose: str, url: str = 'about:blank', keep: bool = False, needs_human: str | None = None,
              flags=()):
+    sid = os.environ.get('CLAUDE_CODE_SESSION_ID')
+    d_sess = kit.session(sid)
+    if sid and d_sess.get('visibility') != 'invisible':  # inside a Claude session: it must have authorized invisible
+        raise PermissionError(
+            f'launch_headless: this Claude session ({sid[:8]}) has not authorized an invisible Chrome'
+            + (f' (it authorized {d_sess["visibility"]})' if d_sess.get('visibility') else '') + '. Run first: agent-chrome '
+            'authorize-tab "<why>" --visibility invisible --visibility-reason "<why headless is enough>" [--project P] '
+            '(skill chrome). Scheduled jobs and scripts run by hand (no $CLAUDE_CODE_SESSION_ID) need nothing.')
     data_dir = Path(data_dir).resolve()
     profile = f'headless:{data_dir}'
-    ctx = dict(session_id=os.environ.get('CLAUDE_CODE_SESSION_ID'), cwd=os.getcwd(), job=os.environ.get('JR_JOB'),
-               profile=profile, purpose=purpose, needs_human=needs_human)
-    project = kit.project_of(ctx['cwd'])
+    ctx = dict(session_id=sid, cwd=os.getcwd(), job=os.environ.get('JR_JOB'), project=d_sess.get('project'),
+               profile=profile, purpose=purpose, visibility='invisible', visibility_reason=d_sess.get('visibility_reason'),
+               needs_human=needs_human)
+    project = d_sess.get('project') or kit.project_of(ctx['cwd'])
     busy(data_dir, visible_only=True)  # never attach to a visible Chrome (it may answer CDP: pwlayer's does)
     port = running_port(data_dir)
     reused = port is not None

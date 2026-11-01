@@ -32,11 +32,31 @@ async function show(tabId) {
   chrome.tabs.sendMessage(tabId, { type: "note", note: forPage(note, tab.url) }).catch(() => {});  // chrome:// pages: badge only
 }
 
+// Bring to front, once: a tab whose session authorized "focused" and marked it as needing a human. Once per need:
+// the need's text is remembered per tab (session storage) and forgotten when the need is cleared. Never without one.
+async function bringToFront() {
+  const { fronted = {} } = await chrome.storage.session.get("fronted");
+  let changed = false;
+  for (const id of Object.keys(fronted))
+    if (!notes[id] || !notes[id].needs_human) { delete fronted[id]; changed = true; }
+  for (const [id, note] of Object.entries(notes)) {
+    if (note.visibility !== "focused" || !note.needs_human || fronted[id] === note.needs_human) continue;
+    try {
+      const tab = await chrome.tabs.get(Number(id));
+      await chrome.windows.update(tab.windowId, { focused: true });
+      await chrome.tabs.update(tab.id, { active: true });
+      fronted[id] = note.needs_human; changed = true;
+    } catch (e) { console.warn("bring to front", id, e); }   // not a tab of this profile
+  }
+  if (changed) await chrome.storage.session.set({ fronted });
+}
+
 async function apply(newNotes) {
   const old = notes; notes = newNotes;
   await chrome.storage.session.set({ notes });
   for (const id of new Set([...Object.keys(old), ...Object.keys(newNotes)]))
     if (JSON.stringify(old[id]) !== JSON.stringify(newNotes[id])) await show(Number(id));
+  await bringToFront();
   Place.place(notes);
 }
 

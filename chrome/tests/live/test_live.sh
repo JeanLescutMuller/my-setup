@@ -35,7 +35,7 @@ run() {  # $1 = run name, $2 = prompt. A clean environment: no parent session id
         "mcp__fakechrome__tabs_context_mcp" "Bash(python3 -I $KIT/agent_chrome.py:*)" \
       --output-format json --max-turns 15 "$2") > "$OUT/$1.json" 2> "$OUT/$1.err" || echo "run $1: exit $?"
 }
-DO='If a tool call is refused or you are asked to do something, do exactly what it says. The tab is for me to look at the page. Finish with one short sentence.'
+DO='If a tool call is refused or you are asked to do something, do exactly what it says. The tab is for me to look at the page; the project is kit-test. Finish with one short sentence.'
 run run1 "Using the fakechrome tools: open a new tab, navigate it to https://example.com, then close it. $DO"
 run run2 "Using the fakechrome tools: open a new tab and navigate it to https://example.org. Do not close it: I will look at it after you stop. $DO"
 FAKE_COMMENTS=$OUT/state/comments.jsonl run run3 "Using the fakechrome tools: open a new tab and navigate it to https://example.net, then close it. $DO"

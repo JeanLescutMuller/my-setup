@@ -7,7 +7,7 @@ Installed by modules/claude_config.sh (PreToolUse on `mcp__claude-in-chrome__.*`
 | Event | Tool | Does |
 |---|---|---|
 | PreToolUse | select_browser, switch_browser | refuses Chrome's Default profile (the user's own), an unknown deviceId, a profile of another project |
-| PreToolUse | tabs_create_mcp, navigate, browser_batch with a navigate, tabs_context_mcp createIfEmpty | refuses until the session ran `agent-chrome authorize-tab "<why>" (--needs-human … or --visible-because …)`; a second tabs_create_mcp is refused ("reuse tab N") |
+| PreToolUse | tabs_create_mcp, navigate, browser_batch with a navigate, tabs_context_mcp createIfEmpty | refuses until the session ran `agent-chrome authorize-tab "<why>" --visibility … --visibility-reason …`; all of them when it authorized `invisible`; a second tabs_create_mcp ("reuse tab N") |
 | PreToolUse | Bash | refuses a visible Chrome started from the shell (`open -a "Google Chrome"`, `--profile-directory`, the binary without --headless) |
 | PostToolUse | any Claude in Chrome tool | its "Available tabs" list corrects open.json: new tab → open, new URL → navigate, gone → close |
 | UserPromptSubmit, PreToolUse, PostToolUse (Chrome) | - | the user's unread comments from the tab → Claude (additionalContext) |
@@ -81,11 +81,11 @@ def visible_launch(cmd: str) -> bool:
         if word.endswith('Contents/MacOS/Google Chrome') and not any(a.startswith('--headless') for a in args):
             return True  # the binary itself, not headless (--profile-directory or not)
     return False
-CLAIM_HELP = (f'  {CLAIM} authorize-tab "<why, in words the human understands>" --needs-human "<what the human must do in the tab>"\n'
-              f'  or, when no human must act but a headless Chrome cannot do it (a logged-in profile: WhatsApp, LinkedIn…):\n'
-              f'  {CLAIM} authorize-tab "<why>" --visible-because "<why headless cannot do it>"\n'
-              'A Claude in Chrome tab is always visible to the human: if no human needs to see it and no logged-in profile is '
-              'needed, use a headless Chrome from a script instead (skill chrome).')
+CLAIM_HELP = (f'  {CLAIM} authorize-tab "<why, in words the human understands>" --visibility invisible|unfocused|focused '
+              '--visibility-reason "<why this level>" [--project P]\n'
+              '  invisible: a headless Chrome from the launcher only (~/opt/my-setup/chrome/launch_headless.py); unfocused: '
+              'Claude in Chrome tabs in the background; focused: also brought to the front once when you mark the tab '
+              f'as needing a human ({CLAIM} mark-as-needing-human "<what>", after opening it). Skill chrome.')
 
 
 def out(d: dict):
@@ -133,6 +133,15 @@ def take_comments(sid: str, d_open: dict) -> str:
             f'\nAnswer it on the tab with {CLAIM} reply-to-human "<your answer>", and here.')
 
 
+def visibility(d_sess: dict) -> str | None:
+    """The session's authorized visibility; a session authorized before 2 Nov 2026 (no field): unfocused."""
+    return d_sess.get('visibility') or ('unfocused' if d_sess.get('purpose') else None)
+
+
+def reason(d_sess: dict) -> str | None:
+    return d_sess.get('visibility_reason') or d_sess.get('visible_because') or d_sess.get('needs_human')
+
+
 def main():
     raw = sys.stdin.read()
     if os.environ.get('CHROME_HOOK_DEBUG'):
@@ -159,7 +168,8 @@ def main():
         return
     d_open = kit.read_open()
     mine = {t: e for t, e in d_open.items() if e.get('session_id') == sid}
-    ctx = dict(session_id=sid, cwd=cwd, job=os.environ.get('JR_JOB'), purpose=d_sess.get('purpose'),
+    ctx = dict(session_id=sid, cwd=cwd, job=os.environ.get('JR_JOB'), project=d_sess.get('project'),
+               purpose=d_sess.get('purpose'), visibility=visibility(d_sess), visibility_reason=reason(d_sess),
                needs_human=d_sess.get('needs_human'))
 
     def say(l_ctx: list):  # these lines, plus the user's unread comments, next to the tool result or the prompt
@@ -188,23 +198,35 @@ def main():
                 deny(f'Refused by the Chrome hook: this session uses "{have}"; a session uses one Chrome profile for its '
                      'whole life, so it never reaches two accounts (LinkedIn and a general site) at once. Keep working '
                      f'in "{have}", or ask the user to start another Claude session for {want}.')
-            if dev in D_DEVICE and D_DEVICE[dev][1] and not any(x in cwd for x in D_DEVICE[dev][1]):
-                deny(f'Refused by the Chrome hook: "{D_DEVICE[dev][0]}" is only for {" or ".join(D_DEVICE[dev][1])} '
-                     '(CLAUDE.md "Chrome profiles"). Use "Claude - general".')
+            l_ok = D_DEVICE[dev][1] if dev in D_DEVICE else None   # the authorized project, else the folder
+            if l_ok and not (d_sess['project'] in kit.projects_of(l_ok) if d_sess.get('project') else any(x in cwd for x in l_ok)):
+                deny(f'Refused by the Chrome hook: "{D_DEVICE[dev][0]}" is only for {" or ".join(sorted(kit.projects_of(l_ok)))} '
+                     f'(CLAUDE.md "Chrome profiles"; this session: project {d_sess.get("project") or kit.project_of(cwd)}). '
+                     'Use "Claude - general".')
             say([])
             return
         new_tab = name == 'tabs_create_mcp' or (name == 'tabs_context_mcp' and d_inp.get('createIfEmpty'))
         opens = new_tab or name == 'navigate' or (
             name == 'browser_batch' and any(x.get('name') == 'navigate' for x in d_inp.get('actions') or []))
         if opens and not d_sess.get('purpose') and os.environ.get('CHROME_PURPOSE'):  # a job without Bash: its environment says why
-            d_sess = kit.update_session(sid, purpose=os.environ['CHROME_PURPOSE'], needs_human=None,
-                                        visible_because=os.environ.get('CHROME_VISIBLE_BECAUSE'))
-            kit.record([{'event': 'claim', 'purpose': d_sess['purpose']}], ctx)
+            vis = os.environ.get('CHROME_VISIBILITY') or 'unfocused'
+            if vis not in kit.VISIBILITIES:
+                deny(f'Chrome hook: CHROME_VISIBILITY={vis!r}: use one of {", ".join(kit.VISIBILITIES)}.')
+            # CHROME_VISIBLE_BECAUSE: the old name of the reason, accepted until 2026-11-08 (job-applications)
+            d_sess = kit.update_session(sid, purpose=os.environ['CHROME_PURPOSE'], needs_human=None, visibility=vis,
+                                        visibility_reason=os.environ.get('CHROME_VISIBILITY_REASON')
+                                        or os.environ.get('CHROME_VISIBLE_BECAUSE'))
+            ctx.update(purpose=d_sess['purpose'], visibility=vis, visibility_reason=d_sess['visibility_reason'])
+            kit.record([{'event': 'claim'}], ctx)
         if opens and not d_sess.get('purpose'):
-            deny('Chrome hook: before this session opens a page, say why, in one Bash call:\n' + CLAIM_HELP + '\nThen retry.')
-        if new_tab and not (d_sess.get('needs_human') or d_sess.get('visible_because')):
-            deny('Chrome hook: this tab will be visible to the human, so say what they must do in it or why headless cannot '
-                 'do it:\n' + CLAIM_HELP + '\nThen retry.')
+            deny('Chrome hook: before this session opens a page, say why and how visible, in one Bash call:\n' + CLAIM_HELP + '\nThen retry.')
+        if opens and visibility(d_sess) == 'invisible':
+            deny(f'Chrome hook: this session authorized invisible: no Claude in Chrome tab. Use the launcher (a headless '
+                 f'Chrome: ~/opt/my-setup/chrome/launch_headless.py, skill chrome), or authorize-tab again with '
+                 f'--visibility unfocused: {CLAIM} authorize-tab "<why>" --visibility unfocused --visibility-reason "<why>".')
+        if new_tab and not reason(d_sess):
+            deny('Chrome hook: this session\'s authorization has no visibility reason (a job: set CHROME_VISIBILITY_REASON). '
+                 'Authorize again:\n' + CLAIM_HELP + '\nThen retry.')
         if name == 'tabs_create_mcp' and mine:
             l_t = [f'tab {t} ({(e.get("url") or "")[:60]})' for t, e in mine.items()]
             deny(f'Chrome hook: this session already has {", ".join(l_t)} open: one tab per session. Reuse it (navigate '

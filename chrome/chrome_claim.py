@@ -57,6 +57,11 @@ def frontmost() -> str:
     return r.stdout.strip() or f'? ({r.stderr.strip()[:60]})'
 
 
+def front_window() -> str:
+    r = subprocess.run(['osascript', '-e', 'tell application "Google Chrome" to get id of window 1'], capture_output=True, text=True)
+    return r.stdout.strip()
+
+
 def window(project: str, sid: str | None, cwd: str, ctx: dict):
     """Open the profile's window in the background (see the module's doc); exits non-zero with the reason if refused."""
     d_sess = kit.session(sid)
@@ -79,9 +84,9 @@ def window(project: str, sid: str | None, cwd: str, ctx: dict):
     # The binary hands --profile-directory to the running Chrome (one more window); `open -g -a` would drop the
     # arguments of an app already running. Tests replace the command ($CHROME_WINDOW_CMD).
     cmd = [os.environ.get('CHROME_WINDOW_CMD') or CHROME_BIN, f'--profile-directory={folder}', url]
-    if os.environ.get('CHROME_WINDOW_METHOD') == 'open-g':   # measured against the binary (2026-11-01)
-        cmd = ['open', '-g', '-n', '-a', 'Google Chrome', '--args'] + cmd[1:]
-    before = frontmost()
+    # Measured 2026-11-01: both the binary and `open -g -n -a … --args` bring Chrome forward (a frontmost app, or the
+    # front Chrome window when the user is in Chrome): so the focus is given back below.
+    before, win_before = frontmost(), front_window()
     t0 = time.monotonic()
     subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     l_front, given_back = [], False
@@ -93,6 +98,10 @@ def window(project: str, sid: str | None, cwd: str, ctx: dict):
                            capture_output=True)
             given_back = True
         time.sleep(0.2)
+    if before == 'Google Chrome' and win_before and front_window() != win_before:   # the user was in Chrome
+        subprocess.run(['osascript', '-e', f'tell application "Google Chrome" to set index of window id {win_before} to 1'],
+                       capture_output=True)
+        given_back = True
     l_win = None
     while time.monotonic() - t0 < 20 and not l_win:   # the kit extension of that profile reports its window
         l_win = kit.profile_windows(profile)
@@ -102,7 +111,7 @@ def window(project: str, sid: str | None, cwd: str, ctx: dict):
     print(f'chrome-claim window: opened "{profile}" ({folder}) for project {project}: '
           + (f'window {l_win}' if l_win else 'no report from its "Agent tab notes" extension yet (not loaded in that profile?)')
           + f'. Frontmost app before: {before}; during 3 s: {", ".join(stole) if stole else "unchanged"}'
-          + ('; focus given back to ' + before if given_back else '') + '.')
+          + (f'; focus given back to {before}' + (f' (window {win_before})' if before == 'Google Chrome' else '') if given_back else '') + '.')
 
 
 def main():

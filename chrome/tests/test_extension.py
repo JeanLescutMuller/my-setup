@@ -103,6 +103,95 @@ def bar_on_top(page) -> bool:
     return page.evaluate("document.elementFromPoint(innerWidth / 2, 8)?.tagName") == 'AGENT-TAB-NOTE'
 
 
+def windows(ctx, ctl, base):
+    """7. One agent window per project (extension/place.js): a session's tab group of project A that lands in another
+    window moves to A's window; the user's tabs never move; a window owned by B is never taken."""
+    js = ctl.evaluate
+    sids = iter(['aaaa0000-0000-4000-8000-00000000000%d' % i for i in range(1, 9)])
+    l_proj = {}
+    for name in ('proj-a', 'proj-b'):
+        (SCRATCH / name / '.git').mkdir(parents=True, exist_ok=True)
+        l_proj[name] = str(SCRATCH / name)
+
+    def agent_group(win, project, path):   # what Claude in Chrome does: an inactive tab, in its own group
+        tab = js(f"chrome.tabs.create({{windowId: {win}, url: '{base}/{path}', active: false}}).then(t => t.id)")
+        gid = js(f"chrome.tabs.group({{tabIds: [{tab}], createProperties: {{windowId: {win}}}}})")
+        return tab, gid
+
+    def rec(tab, project, url):
+        kit.record([{'event': 'open', 'tab_id': tab, 'url': url, 'profile': 'Claude - general', 'device_id': GEN}],
+                   {'session_id': next(sids), 'cwd': l_proj[project]})
+
+    tab_of = lambda t: js(f'chrome.tabs.get({t})')
+    s_win = lambda: set(js("chrome.windows.getAll({windowTypes: ['normal']}).then(l => l.map(w => w.id))"))
+    mapping = lambda: js("chrome.storage.local.get('map').then(r => r.map || {})")
+    active = lambda w: js(f'chrome.tabs.query({{windowId: {w}, active: true}}).then(l => l[0].id)')
+    marker = lambda proj: f'chrome-extension://{EXT_ID}/window.html?project={proj}&profile=Claude+-+general'
+
+    # 7a. `chrome-claim window` opened A's window (its first tab: window.html?project=proj-a)
+    w_a = js(f"chrome.windows.create({{focused: false, url: '{marker('proj-a')}'}}).then(w => w.id)")
+    time.sleep(1.5)
+    d_rep = kit.read_json(STATE / 'windows' / 'Claude - general.json')
+    l_mk = js(f'chrome.tabs.query({{windowId: {w_a}}})')
+    check('7a. the window opened for A (marker tab, pinned) is A\'s window; reported in windows/<profile>.json',
+          mapping().get('proj-a') == w_a and l_mk[0]['pinned'] and w_a in d_rep.get('windows', [])
+          and d_rep.get('projects', {}).get('proj-a') == w_a, (mapping(), d_rep))
+
+    # 7b. the user's window (focused, a page of theirs); a new session of A lands there
+    w_u = js(f"chrome.windows.create({{focused: true, url: '{base}/user-page'}}).then(w => w.id)")
+    time.sleep(1)
+    t_user = active(w_u)
+    t1, g1 = agent_group(w_u, 'proj-a', 'a1')
+    time.sleep(1)
+    pg = next(x for x in ctx.pages if x.url.endswith('/a1'))   # a CDP session attached before the move (as Claude in Chrome's)
+    a_before = active(w_a)
+    rec(t1, 'proj-a', f'{base}/a1')
+    time.sleep(2.5)
+    t1i = tab_of(t1)
+    check('7b. A\'s group moved from the user\'s window to A\'s window, same group id, not made active',
+          t1i['windowId'] == w_a and t1i['groupId'] == g1 and not t1i['active'] and active(w_a) == a_before, t1i)
+    check('7b. the user\'s tab and window untouched (still there, still active)',
+          tab_of(t_user)['windowId'] == w_u and active(w_u) == t_user and w_u in s_win())
+    try:
+        title = pg.evaluate('document.title')
+        pg.goto(f'{base}/a1-next')
+        shot = len(pg.screenshot())
+        ok = 'Fixed header' in title and tab_of(t1)['url'].endswith('/a1-next') and shot > 1000
+    except Exception as e:  # noqa: BLE001
+        ok, title = False, str(e)
+    check('7b. after the move the same CDP session still reads, navigates and screenshots the tab', ok, title)
+
+    # 7c. a session of B lands in A's window: B gets its own new window (A's is never taken)
+    t2, g2 = agent_group(w_a, 'proj-b', 'b1')
+    rec(t2, 'proj-b', f'{base}/b1')
+    time.sleep(2.5)
+    t2i, m = tab_of(t2), mapping()
+    w_b = m.get('proj-b')
+    check('7c. B landed in A\'s window: a new window for B, its group moved there; A keeps its window',
+          w_b not in (None, w_a, w_u) and t2i['windowId'] == w_b and t2i['groupId'] == g2 and m.get('proj-a') == w_a, (m, t2i))
+    check('7c. B\'s new window starts with its marker tab', any('project=proj-b' in (x.get('url') or x.get('pendingUrl') or '')
+                                                             for x in js(f'chrome.tabs.query({{windowId: {w_b}}})')))
+
+    # 7d. a window created by the group's arrival (unfocused, only a new tab): moved out, then closed
+    w_new = js("chrome.windows.create({focused: false}).then(w => w.id)")
+    time.sleep(0.5)
+    t3, _ = agent_group(w_new, 'proj-a', 'a2')
+    rec(t3, 'proj-a', f'{base}/a2')
+    time.sleep(2.5)
+    check('7d. a window the arrival created: group moved to A\'s, the empty window closed',
+          tab_of(t3)['windowId'] == w_a and w_new not in s_win(), s_win())
+
+    # 7e. a group holding a user's tab (not in open.json): never moved
+    t4, g4 = agent_group(w_u, 'proj-a', 'a3')
+    t_mine = js(f"chrome.tabs.create({{windowId: {w_u}, url: '{base}/user-2', active: false}}).then(t => t.id)")
+    js(f'chrome.tabs.group({{tabIds: [{t_mine}], groupId: {g4}}})')
+    rec(t4, 'proj-a', f'{base}/a3')
+    time.sleep(2.5)
+    check('7e. a group with a user\'s tab in it stays where it is', tab_of(t4)['windowId'] == w_u and tab_of(t_mine)['windowId'] == w_u)
+    log = js("chrome.storage.session.get('placeLog').then(r => r.placeLog || [])")
+    print('      placeLog:', [(x.get('action'), x.get('project'), x.get('tab')) for x in log][-8:])
+
+
 def main():
     profile = SCRATCH / 'profile'
     shutil.rmtree(profile, ignore_errors=True)
@@ -231,10 +320,15 @@ def main():
             time.sleep(2)
             check('close: bar gone, page margin back to 0', not page.evaluate("!!document.querySelector('agent-tab-note')")
                   and page.evaluate('getComputedStyle(document.documentElement).marginTop') == '0px' and badge(tid) == '')
+
+            windows(ctx, ctl, base)
     finally:
         proc.terminate()
         proc.wait(30)
         srv.shutdown()
+    time.sleep(2)
+    check('Chrome gone: its windows report removed (the host deletes it when the port closes)',
+          not (STATE / 'windows' / 'Claude - general.json').exists())
     print(f'{sum(results)}/{len(results)} checks passed')
     sys.exit(0 if all(results) else 1)
 

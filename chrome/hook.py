@@ -33,12 +33,7 @@ import chrome_kit as kit  # noqa: E402  (next to this file)
 
 CHROME = os.environ.get('CHROME_HOOK_PREFIX', 'mcp__claude-in-chrome__')
 CLAIM = os.environ.get('CHROME_CLAIM_CMD', 'chrome-claim')
-# deviceId -> (profile name, folders of the only projects allowed to use it, or None = any): AGENTS_LOCAL.md "Chrome profiles"
-D_DEVICE = {
-    '331a94e7-f123-4e09-a755-cdc63980187f': ('Claude - general', None),
-    'f16617c3-d0dc-425b-a7a4-d925eec10bf5': ('Claude - LinkedIn', ('/dev/job-applications', '/opt/job-applications')),
-    'db5922d3-1713-4df0-a025-1ac608fac5f1': ('Claude - Facebook', ('/dev/marketplace-seller', '/opt/marketplace-seller')),
-}
+D_DEVICE = kit.D_DEVICE  # deviceId -> (profile name, projects allowed or None): chrome_kit
 DEFAULT_PREFIX = '7ffa990a'  # Chrome's Default profile: the user's own, with their password vault. Never.
 RE_TAB = re.compile(r'tabId (\d+): "(?:[^"\\]|\\.)*" \("((?:[^"\\]|\\.)*)"\)')  # • tabId 249416209: "title" ("url")
 RE_HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)(\w+)\2")
@@ -152,7 +147,8 @@ def main():
             deny('Refused by the Chrome hook: a Chrome window started from the shell appears in front of the user and no '
                  'agent tool can see or close it (CLAUDE.md "Chrome profiles"). Use a headless Chrome from a script '
                  '(skill chrome-headless; ~/opt/my-setup/chrome/launch_headless.py), or, to show the user a page, Claude in '
-                 'Chrome in the right profile; if that profile is not connected, ask the user to open it.')
+                 'Chrome in the right profile; if that profile is not connected, open its window in the background with '
+                 f'`{CLAIM} window` (the one sanctioned way: no focus, only when the profile has no window).')
         return
     if not sid:
         return

@@ -179,8 +179,43 @@ for cmd, want in [('open -na "Google Chrome" --args --profile-directory="Profile
                   ('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --user-data-dir=/tmp/p about:blank', 'deny'),
                   ('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --user-data-dir=/tmp/p', None),
                   ('pgrep -f "MacOS/Google Chrome"', None), ('grep -rn "Google Chrome" ~/dev', None),
-                  ('.venv/bin/python -m common.chrome open', None)]:
+                  ('.venv/bin/python -m common.chrome open', None), ('chrome-claim window', None),
+                  ('chrome-claim window --project job-applications', None),
+                  ('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --profile-directory="Profile 3"', 'deny')]:
     check(f'Bash {want or "allow"}: {cmd[:60]}', decision(hook('PreToolUse', 'Bash', {'command': cmd})) == want)
+d = hook('PreToolUse', 'Bash', {'command': 'open -a "Google Chrome"'})
+check('the shell-launch refusal points to chrome-claim window', 'chrome-claim window' in reason(d))
+
+# chrome-claim window: Claude in Chrome's profile not connected -> its window, in the background
+(tmp / 'Local State').write_text(json.dumps({'profile': {'info_cache': {'Default': {'name': 'me@x.ch'}, 'Profile 3': {'name': 'Claude - general'},
+                                                                        'Profile 6': {'name': 'Claude - LinkedIn'}}}}))
+fake = tmp / 'fake_chrome.sh'      # the "Chrome binary": logs its arguments, then the extension reports the new window
+fake.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$CHROME_STATE/fake-args"\nmkdir -p "$CHROME_STATE/windows"\n'
+                'printf \'{"pid": %s, "profile": "Claude - general", "windows": [77]}\' "$KEEP_PID" > "$CHROME_STATE/windows/Claude - general.json"\n')
+fake.chmod(0o755)
+keep = subprocess.Popen(['sleep', '60'])   # a live "native host" pid
+ENV.update(CHROME_LOCAL_STATE=str(tmp / 'Local State'), CHROME_WINDOW_CMD=str(fake), KEEP_PID=str(keep.pid), CLAUDE_CODE_SESSION_ID='sess-W')
+r = cli('chrome_claim.py', 'window')
+args = (tmp / 'state/fake-args').read_text().split('\n') if (tmp / 'state/fake-args').exists() else []
+check('window: opens "Claude - general" (Profile 3) with the project\'s marker tab, waits for its window report',
+      r.returncode == 0 and '--profile-directory=Profile 3' in args and any('window.html?project=proj-x' in a for a in args)
+      and 'window [77]' in r.stdout and 'Frontmost app before' in r.stdout, )
+check('window: recorded in the history', history()[-1]['event'] == 'window' and history()[-1]['profile'] == 'Claude - general')
+(tmp / 'state/fake-args').unlink()
+r = cli('chrome_claim.py', 'window')
+check('window: the profile already has a window -> nothing opened', r.returncode == 0 and 'already has' in r.stdout
+      and not (tmp / 'state/fake-args').exists())
+keep.kill()
+ENV['CLAUDE_CODE_SESSION_ID'] = 'sess-L'
+(tmp / 'state/sessions/sess-L.json').write_text(json.dumps({'profile': 'Claude - LinkedIn'}))
+r = cli('chrome_claim.py', 'window')
+check('window: the session\'s LinkedIn profile from another project -> refused', r.returncode != 0 and 'only for' in r.stderr)
+ENV['CLAUDE_CODE_SESSION_ID'] = 'sess-W'
+ps_saved = ps.read_text()
+ps.write_text('')
+r = cli('chrome_claim.py', 'window')
+check('window: Chrome not running -> refused (never starts it: it would reopen the user\'s own profile)', r.returncode != 0 and 'not running' in r.stderr)
+ps.write_text(ps_saved)
 check('hook never failed (no hook-errors.log)', not (tmp / 'state/hook-errors.log').exists())
 print(f'{n_pass} passed, {n_fail} failed; state: {tmp / "state"}')
 sys.exit(bool(n_fail))

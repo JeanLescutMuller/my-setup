@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Agent window</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 -apple-system, BlinkMacSystemFont, sans-serif; margin: 40px auto; max-width: 560px; padding: 0 16px; background: Canvas; color: CanvasText; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { opacity: .7; margin: 0 0 20px; }
+  #status { font-size: 13px; opacity: .7; }
+</style></head>
+<body>
+  <h1 id="title">Agent window</h1>
+  <p class="sub" id="profile"></p>
+  <p>The Claude sessions of this project open their tabs in this window, in the background. Put it on the project's desktop once: it stays there.</p>
+  <p>Keep this tab: the window stays open between sessions. Close the window when you no longer want it; the next session opens a new one.</p>
+  <p id="status"></p>
+  <script src="window.js"></script>
+</body></html>

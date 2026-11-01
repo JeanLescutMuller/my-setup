@@ -33,6 +33,15 @@ FIELDS = ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd',
           'url', 'purpose', 'needs_human', 'message', 'reply_to']
 FIELDS_OPEN = FIELDS[:2] + ['opened_ts', 'opened_dt'] + FIELDS[2:]
 RE_CHROME_MAIN = re.compile(r'MacOS/Google Chrome( |$)')
+# deviceId -> (profile name, folders of the only projects allowed to use it, or None = any): AGENTS_LOCAL.md "Chrome profiles"
+D_DEVICE = {
+    '331a94e7-f123-4e09-a755-cdc63980187f': ('Claude - general', None),
+    'f16617c3-d0dc-425b-a7a4-d925eec10bf5': ('Claude - LinkedIn', ('/dev/job-applications', '/opt/job-applications')),
+    'db5922d3-1713-4df0-a025-1ac608fac5f1': ('Claude - Facebook', ('/dev/marketplace-seller', '/opt/marketplace-seller')),
+}
+# Chrome's top-level "Local State" (not inside a profile folder: profile folders are never read): profile names -> folders
+LOCAL_STATE = Path(os.environ.get('CHROME_LOCAL_STATE') or Path.home() / 'Library/Application Support/Google/Chrome/Local State')
+WINDOWS = STATE / 'windows'   # <profile>.json: the windows of a profile, as its "Agent tab notes" extension sees them
 
 
 def utc(ts: int) -> str:
@@ -153,6 +162,32 @@ def update_session(sid: str, **kw) -> dict:
         d = {**read_json(f), **kw}
         write_json(f, d)
     return d
+
+
+def profile_for(cwd: str) -> str:
+    """The agent profile of a project folder: the one reserved for it (LinkedIn, Facebook), else "Claude - general"."""
+    return next((n for n, l_ok in D_DEVICE.values() if l_ok and any(x in cwd for x in l_ok)), 'Claude - general')
+
+
+def profile_folders() -> dict:
+    """{profile name: its folder name} from Chrome's Local State (profile.info_cache)."""
+    d = read_json(LOCAL_STATE).get('profile', {}).get('info_cache', {})
+    return {v.get('name'): k for k, v in d.items() if v.get('name')}
+
+
+def alive(pid) -> bool:
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def profile_windows(profile: str) -> list | None:
+    """The window ids of this profile, as its kit extension reported them (windows/<profile>.json, written by
+    native_host.py while the extension runs); None when no running extension reports for this profile."""
+    d = read_json(WINDOWS / f'{profile}.json')
+    return d.get('windows', []) if d and alive(d.get('pid')) else None
 
 
 def chrome_processes() -> list[dict]:

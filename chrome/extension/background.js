@@ -2,7 +2,10 @@
 // Gets the Chrome kit's record of agent tabs from the native host (chrome/native_host.py) and shows each tab's note:
 // the toolbar badge, the bar at the top of the page (note.js; push.js moves the page down so nothing is covered),
 // and the side panel (details, the thread with the agent, a comment box). Comments go back to the host, which
-// appends them to comments.jsonl for the session. The tab group belongs to Claude in Chrome: left alone.
+// appends them to comments.jsonl for the session. Each project's agent tab groups go to that project's window
+// (place.js: moved with chrome.tabGroups.move, never the user's tabs); the profile's windows are reported to the host
+// (windows/<profile>.json: chrome-claim window opens a window only for a profile without one).
+importScripts("place.js");
 const HOST = "com.jeanlescut.agent_tab_notes";
 // Sites with strong bot checks: the bar only when the human must act there (the badge always).
 const QUIET_HOSTS = ["linkedin.com", "facebook.com", "messenger.com", "instagram.com"];
@@ -34,7 +37,14 @@ async function apply(newNotes) {
   await chrome.storage.session.set({ notes });
   for (const id of new Set([...Object.keys(old), ...Object.keys(newNotes)]))
     if (JSON.stringify(old[id]) !== JSON.stringify(newNotes[id])) await show(Number(id));
+  Place.place(notes);
 }
+
+async function report() {   // this profile's windows -> the host -> windows/<profile>.json
+  const { map, profile } = await Place.local();
+  if (port && profile) port.postMessage({ windows: { profile, windows: await Place.normalIds(), projects: map } });
+}
+Place.setReport(report);
 
 function connect() {
   if (port) return;
@@ -42,6 +52,7 @@ function connect() {
   port.onMessage.addListener(m => { if (m.notes) apply(m.notes); });
   port.onDisconnect.addListener(() => { console.warn("native host gone", chrome.runtime.lastError?.message); port = null; setTimeout(connect, 5000); });
   port.postMessage({ hello: 1 });   // the host then sends {notes} at once and after every change of the record
+  report();
 }
 
 chrome.runtime.onMessage.addListener((m, sender, reply) => {
@@ -52,6 +63,9 @@ chrome.runtime.onMessage.addListener((m, sender, reply) => {
   } else if (m.type === "openPanel" && sender.tab) {   // the bar's "details · reply" (a click: allowed to open it)
     chrome.sidePanel.open({ tabId: sender.tab.id }).then(() => "opened", e => String(e))
       .then(r => { chrome.storage.session.set({ lastOpen: r }); reply({ result: r }); });
+    return true;
+  } else if (m.type === "marker" && sender.tab) {   // window.html: this window is the project's agent window
+    Place.marker(m.project, m.profile, sender.tab).then(reply);
     return true;
   } else if (m.type === "comment") {             // the side panel: the user's message to the agent
     chrome.tabs.get(m.tabId).then(tab => {
@@ -64,6 +78,8 @@ chrome.runtime.onMessage.addListener((m, sender, reply) => {
 });
 chrome.tabs.onUpdated.addListener((tabId, info) => { if (info.status === "complete" && notes[String(tabId)]) show(tabId); });
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});   // click the icon = the panel
-chrome.runtime.onStartup.addListener(connect);
+chrome.windows.onCreated.addListener(w => Place.created(w), { windowTypes: ["normal"] });
+chrome.windows.onRemoved.addListener(wid => Place.removed(wid), { windowTypes: ["normal"] });
+chrome.runtime.onStartup.addListener(() => { Place.startup(); connect(); });
 chrome.runtime.onInstalled.addListener(connect);
 chrome.storage.session.get("notes").then(r => { notes = r.notes || {}; connect(); });

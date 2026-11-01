@@ -6,7 +6,9 @@ stops it when the extension goes; the host manifest that allows it is written by
 Chrome's own NativeMessagingHosts/ folder (not a profile).
 Reads $CHROME_STATE (chrome_kit): open.json (what is open now), history/YYYY-MM.jsonl (the agents' "message" events:
 their replies), comments.jsonl (the user's comments). Writes one line to comments.jsonl per comment typed in the
-side panel: ts, dt, session_id, tab_id, url, text (hook.py gives it to the session).
+side panel: ts, dt, session_id, tab_id, url, text (hook.py gives it to the session). Writes windows/<profile>.json
+while the extension runs: ts, dt, pid, profile, windows (ids), projects ({project: its agent window}); removed when
+the extension goes (chrome-claim window reads it: does this profile have a window?).
 Sends the extension {"notes": {tab_id: entry + "thread"}} at start and after every change of those files: only
 Claude in Chrome tabs (device_id set) opened since the user's Chrome started (Chrome reuses tab ids after a restart).
 Python 3.9 (macOS /usr/bin/python3), standard library only.
@@ -26,12 +28,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chrome_kit as kit  # noqa: E402
 
 lock_out = threading.Lock()
+d_mine = {'windows_file': None}   # the windows/<profile>.json this host wrote: removed when Chrome closes the port
 
 
 def read_message() -> dict:
     raw = sys.stdin.buffer.read(4)
-    if len(raw) < 4:
-        os._exit(0)                                   # Chrome closed the port (from the reader thread too)
+    if len(raw) < 4:                                  # Chrome closed the port (from the reader thread too)
+        if d_mine['windows_file']:
+            Path(d_mine['windows_file']).unlink(missing_ok=True)
+        os._exit(0)
     return json.loads(sys.stdin.buffer.read(struct.unpack('<I', raw)[0]))
 
 
@@ -94,6 +99,19 @@ def add_comment(d: dict):
             f.write(json.dumps(row, ensure_ascii=False) + '\n')
 
 
+def write_windows(d: dict):
+    """The extension's report of its profile's windows -> windows/<profile>.json (one profile per extension)."""
+    profile = str(d.get('profile') or '')
+    if not profile or '/' in profile or profile.startswith('.'):
+        return
+    ts = int(time.time())
+    kit.WINDOWS.mkdir(parents=True, exist_ok=True)
+    f = kit.WINDOWS / f'{profile}.json'
+    kit.write_json(f, {'ts': ts, 'dt': kit.utc(ts), 'pid': os.getpid(), 'profile': profile,
+                       'windows': d.get('windows') or [], 'projects': d.get('projects') or {}})
+    d_mine['windows_file'] = str(f)
+
+
 def stamp() -> tuple:
     l = []
     for p in [kit.OPEN, kit.COMMENTS, *history_files()]:
@@ -113,6 +131,8 @@ def main():
             m = read_message()
             if m.get('comment'):
                 add_comment(m['comment'])
+            if m.get('windows'):
+                write_windows(m['windows'])
 
     threading.Thread(target=reader, daemon=True).start()
     last = None

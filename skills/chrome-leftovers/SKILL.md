@@ -9,6 +9,10 @@ The user runs this by hand when they find windows they did not open (17 Oct 2026
 
 ## 1. Report (read-only)
 
+**First `chrome-who`** (Chrome kit, 2026-11-01): every tab opened through Claude in Chrome or the launcher since then, with when, which session (UUID), which project, why, and whether the user must act; every Chrome process and whether the kit started it; `BLIND` when several visible Chromes run (then AppleScript below may list the wrong one's windows: deal with the orphan first). `chrome-who --since 24h` for what was opened and closed.
+
+Then, only for windows and tabs `chrome-who` does not know (opened before the kit, or from the shell), the older report:
+
 ```bash
 python3 -I ~/.claude/skills/chrome-leftovers/scripts/leftovers.py --hours 24 > /tmp/leftovers.md 2>&1; cat /tmp/leftovers.md
 ```

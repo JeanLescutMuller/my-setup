@@ -8,9 +8,13 @@ Kept in $CHROME_STATE (default ~/opt/my-setup/state/chrome/; tests set a scratch
   comments.jsonl         the user's comments typed on a tab (written by the extension): ts, dt, session_id, tab_id, url, text.
   sessions/<id>.json     per Claude session: its authorization (purpose, project, visibility, visibility_reason),
                          needs_human, the browser it selected, how far its comments were read. Internal to the kit.
+  sessions/<id>.notices.jsonl  what the kit must tell the session at its next hook call (today: a tab of its that
+                         expired), written by native_host.py, read and removed by hook.py.
 Fields, in this order: ts, dt, [opened_ts, opened_dt: open.json only], event (open|navigate|claim|needs_human|done|
-message|close|window), session_id, project, job, machine, cwd, profile, device_id, tab_id, url, purpose, visibility
-(invisible|unfocused|focused), visibility_reason, needs_human, message, reply_to. Headless tabs: profile "headless:<data folder>", tab_id = the CDP target id, device_id null; a
+message|close|expired|window), session_id, project, job, machine, cwd, profile, device_id, tab_id, url, purpose,
+visibility (invisible|unfocused|focused), visibility_reason, needs_human, expires_ts, message, reply_to.
+expires_ts: when a tab that needs a human is closed if nobody acted (needs_human set + NEEDS_HUMAN_TTL; set by
+record(), so every writer gets it); the extension closes it then and the record says "expired". Headless tabs: profile "headless:<data folder>", tab_id = the CDP target id, device_id null; a
 visible Chrome a script records itself (secrets-and-account-migration's pwlayer): profile "visible:<data folder>".
 Python 3.9+ (macOS's /usr/bin/python3), standard library only.
 """
@@ -30,7 +34,11 @@ from pathlib import Path
 STATE = Path(os.environ.get('CHROME_STATE') or Path.home() / 'opt/my-setup/state/chrome')
 OPEN, HISTORY, COMMENTS, SESSIONS = STATE / 'open.json', STATE / 'history', STATE / 'comments.jsonl', STATE / 'sessions'
 FIELDS = ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id',
-          'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'message', 'reply_to']
+          'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'expires_ts', 'message', 'reply_to']
+# A tab kept for a human is closed after this, if nobody acted: 2 h, the deadline the user set for auto-job-apply
+# (21 Oct 2026). $CHROME_NEEDS_HUMAN_TTL (seconds) overrides it for tests, in the process that marks the need.
+NEEDS_HUMAN_TTL = int(os.environ.get('CHROME_NEEDS_HUMAN_TTL') or 7200)
+GONE = ('close', 'expired')   # events that end a tab
 VISIBILITIES = ('invisible', 'unfocused', 'focused')  # authorize-tab --visibility: what the hook lets the session do
 FIELDS_OPEN = FIELDS[:2] + ['opened_ts', 'opened_dt'] + FIELDS[2:]
 RE_CHROME_MAIN = re.compile(r'MacOS/Google Chrome( |$)')
@@ -129,6 +137,20 @@ def read_open() -> dict:
     return read_json(OPEN)
 
 
+def set_need(e: dict, need, ts: int):
+    """e's needs_human becomes `need`; its deadline (expires_ts) starts when the need is new, goes with it."""
+    if not need:
+        e['expires_ts'] = None
+    elif need != e.get('needs_human') or not e.get('expires_ts'):
+        e['expires_ts'] = ts + NEEDS_HUMAN_TTL
+    e['needs_human'] = need
+
+
+def ttl_text(s: int | None = None) -> str:
+    s = NEEDS_HUMAN_TTL if s is None else s
+    return f'{s / 3600:g} h' if s >= 3600 else f'{s // 60} min' if s >= 60 else f'{s} s'
+
+
 def row(ev: dict, d_ctx: dict) -> dict:
     """One history row in FIELDS order: the event's fields, then the context's (session, cwd…), then defaults."""
     d = {**d_ctx, **ev}
@@ -147,6 +169,9 @@ def record(l_ev: list[dict], d_ctx: dict | None = None, fanout: dict | None = No
     updates every open tab of d_ctx's session (a claim, a need, a message: what the tab shows)."""
     d_ctx = d_ctx or {}
     l_rows = [row(ev, d_ctx) for ev in l_ev]
+    for r in l_rows:   # the need's deadline, in the history too
+        if r['event'] == 'needs_human' and r['needs_human'] and not r['expires_ts']:
+            r['expires_ts'] = r['ts'] + NEEDS_HUMAN_TTL
     with locked(OPEN):
         HISTORY.mkdir(parents=True, exist_ok=True)
         for r in l_rows:
@@ -157,17 +182,21 @@ def record(l_ev: list[dict], d_ctx: dict | None = None, fanout: dict | None = No
             if r['tab_id'] is None:
                 continue
             key = str(r['tab_id'])
-            if r['event'] == 'close':
+            if r['event'] in GONE:
                 d_open.pop(key, None)
                 continue
             old = d_open.get(key, {'opened_ts': r['ts'], 'opened_dt': r['dt']})
-            # message stays until a new one; needs_human is always the latest (null = nothing needed)
-            new = {**old, **{k: v for k, v in r.items() if v is not None or k == 'needs_human'}}
+            # message stays until a new one; needs_human is always the latest (null = nothing needed), its deadline with it
+            new = {**old, **{k: v for k, v in r.items() if v is not None and k not in ('needs_human', 'expires_ts')}}
+            set_need(new, r['needs_human'], r['ts'])
             d_open[key] = {k: new.get(k) for k in FIELDS_OPEN}
         if fanout and l_rows:
             for key, e in d_open.items():
                 if e.get('session_id') == d_ctx.get('session_id'):
-                    e.update(fanout, ts=l_rows[-1]['ts'], dt=l_rows[-1]['dt'], event=l_rows[-1]['event'])
+                    e.update({k: v for k, v in fanout.items() if k != 'needs_human'},
+                             ts=l_rows[-1]['ts'], dt=l_rows[-1]['dt'], event=l_rows[-1]['event'])
+                    if 'needs_human' in fanout:
+                        set_need(e, fanout['needs_human'], l_rows[-1]['ts'])
         write_json(OPEN, d_open)
     return l_rows
 

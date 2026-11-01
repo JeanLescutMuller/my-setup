@@ -200,7 +200,8 @@ def parser() -> argparse.ArgumentParser:
                                                   '~/opt/<repo>; inside, <repo> (another value is refused)')
     p = sub.add_parser('mark-as-needing-human', help="a human must act in this session's tab now",
                        description="A human must act in this session's tab now: shown on the tab as NEEDS HUMAN (and, "
-                                   'authorized focused, the tab is brought to the front once).')
+                                   'authorized focused, the tab is brought to the front once). If nobody acts within 2 h, '
+                                   'the kit closes the tab ("expired") and tells the session at its next tool call.')
     p.add_argument('what', metavar='WHAT', help='what the human must do')
     sub.add_parser('mark-as-human-done', help="the human's part is over", description="The human's part is over: NEEDS HUMAN cleared.")
     p = sub.add_parser('reply-to-human', help="answer the human's comment, shown on the tab",
@@ -276,7 +277,9 @@ def main(argv: list | None = None):
                      'visibility_reason': d_sess.get('visibility_reason'), 'needs_human': a.what}], ctx,
                    fanout={'purpose': d_sess['purpose'], 'needs_human': a.what})
         print(f'{me}: recorded for {sid[:8]}: NEEDS HUMAN: {a.what}'
-              + ('; its tab is brought to the front once (authorized focused)' if d_sess.get('visibility') == 'focused' else ''))
+              + ('; its tab is brought to the front once (authorized focused)' if d_sess.get('visibility') == 'focused' else '')
+              + f'. If nobody acts, the kit closes it at {hm(time.time() + kit.NEEDS_HUMAN_TTL)} '
+                f'({kit.ttl_text()}) and tells this session ("expired").')
     elif a.cmd == 'mark-as-human-done':
         kit.update_session(sid, needs_human=None)
         kit.record([{'event': 'done', 'purpose': d_sess.get('purpose'), 'needs_human': None}], ctx, fanout={'needs_human': None})

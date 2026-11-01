@@ -7,13 +7,14 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "
 const hhmm = ts => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const ROWS = [["opened_dt", "opened (UTC)"], ["session_id", "session"], ["project", "project"], ["job", "scheduled job"],
               ["purpose", "why"], ["visibility", "visibility"], ["visibility_reason", "why that visibility"],
-              ["needs_human", "needs human"], ["reply_to", "reach it"], ["dt", "last event (UTC)"],
+              ["needs_human", "needs human"], ["expires", "closes if nobody acts"], ["reply_to", "reach it"], ["dt", "last event (UTC)"],
               ["event", "last event"], ["machine", "machine"], ["cwd", "folder"], ["profile", "Chrome profile"], ["url", "url"]];
 let shown = "";
 async function draw() {
   const { note } = await chrome.runtime.sendMessage({ type: "get", tabId });
   const key = JSON.stringify(note);
   if (!note || key === shown) return;
+  if (note.expires_ts && note.needs_human) note.expires = new Date(note.expires_ts * 1000).toLocaleString();
   shown = key;
   document.getElementById("action").innerHTML = note.needs_human ? `<div class="action">⚠ NEEDS HUMAN: ${esc(note.needs_human)}</div>` : "";
   const thread = note.thread || [];

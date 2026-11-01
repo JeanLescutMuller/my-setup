@@ -12,8 +12,10 @@ Installed by modules/claude_config.sh (PreToolUse on `mcp__claude-in-chrome__.*`
 | PostToolUse | any Claude in Chrome tool | its "Available tabs" list corrects open.json: new tab → open, new URL → navigate, gone → close |
 | UserPromptSubmit, PreToolUse, PostToolUse (Chrome) | - | the user's unread comments from the tab → Claude (additionalContext) |
 | Stop | - | unread comments → block, so Claude answers; else, once per stop: a tab still open and nobody waits → "close it, or mark it as needing a human" |
+| every event above, Bash too | - | the session's notices (sessions/<id>.notices.jsonl, written by native_host.py: "your tab N expired") → Claude, once |
 
-Reads: stdin, ~/opt/my-setup/state/chrome/ (chrome_kit). Writes: open.json, history/, sessions/<id>.json, hook-errors.log.
+Reads: stdin, ~/opt/my-setup/state/chrome/ (chrome_kit). Writes: open.json, history/, sessions/<id>.json, hook-errors.log;
+removes sessions/<id>.notices.jsonl once delivered.
 Fails open: on its own error it logs to hook-errors.log and lets the call through (exit 0, no output).
 Tests only: $CHROME_HOOK_PREFIX (a fake MCP server's tool prefix), $AGENT_CHROME_CMD, $CHROME_HOOK_DEBUG (keep stdin).
 """
@@ -93,7 +95,11 @@ def out(d: dict):
     sys.exit(0)
 
 
+NOTICES = ['']  # this call's notices (take_notices): a refusal carries them too, or they would be lost
+
+
 def deny(reason: str):
+    reason = '\n'.join(x for x in [reason, NOTICES[0]] if x)
     out({'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'permissionDecision': 'deny', 'permissionDecisionReason': reason}})
 
 
@@ -133,6 +139,22 @@ def take_comments(sid: str, d_open: dict) -> str:
             f'\nAnswer it on the tab with {CLAIM} reply-to-human "<your answer>", and here.')
 
 
+def take_notices(sid: str) -> str:
+    """What the kit must tell this session (a tab of its expired), once: the file is removed under its lock."""
+    f = kit.SESSIONS / f'{sid}.notices.jsonl'
+    if not f.exists():
+        return ''
+    with kit.locked(f):
+        try:
+            l_n = [json.loads(x) for x in f.read_text().splitlines() if x.strip()]
+            f.unlink()
+        except (FileNotFoundError, ValueError):
+            return ''
+    return '\n'.join(f'Chrome kit: your tab {n.get("tab_id")} ({(n.get("url") or "")[:60]}) expired: the human didn\'t act in '
+                     f'{kit.ttl_text(n.get("after_s"))} (NEEDS HUMAN: "{n.get("needs_human")}"); the kit closed it at '
+                     f'{(n.get("dt") or "")[11:16]} UTC. Tell the user; open it again only if they ask.' for n in l_n)
+
+
 def visibility(d_sess: dict) -> str | None:
     """The session's authorized visibility; a session authorized before 2 Nov 2026 (no field): unfocused."""
     return d_sess.get('visibility') or ('unfocused' if d_sess.get('purpose') else None)
@@ -151,20 +173,23 @@ def main():
     event, tool, sid = d_in.get('hook_event_name'), d_in.get('tool_name') or '', d_in.get('session_id')
     d_inp, cwd = d_in.get('tool_input') or {}, d_in.get('cwd') or ''
 
-    if event == 'PreToolUse' and tool == 'Bash':  # first: every Bash call pays this, so nothing is read
+    if event == 'PreToolUse' and tool == 'Bash':  # first: every Bash call pays this, so nothing is read but one stat
         if visible_launch(str(d_inp.get('command', ''))):
             deny('Refused by the Chrome hook: a Chrome window started from the shell appears in front of the user and no '
                  'agent tool can see or close it (CLAUDE.md "Chrome profiles"). Use a headless Chrome from a script '
                  '(skill chrome; ~/opt/my-setup/chrome/launch_headless.py), or, to show the human a page, Claude in '
                  'Chrome in the right profile; if that profile is not connected, open its window in the background with '
                  f'`{CLAIM} open-profile-window` (the one sanctioned way: no focus, only when the profile has no window).')
+        if sid and (txt := take_notices(sid)):
+            out({'hookSpecificOutput': {'hookEventName': event, 'additionalContext': txt}})
         return
     if not sid:
         return
 
     d_sess = kit.session(sid)
     pending = kit.COMMENTS.exists() and kit.COMMENTS.stat().st_size > d_sess.get('comments_offset', 0)
-    if event == 'UserPromptSubmit' and not pending:  # the usual case: two stats, nothing else
+    notices = NOTICES[0] = take_notices(sid)
+    if event == 'UserPromptSubmit' and not pending and not notices:  # the usual case: three stats, nothing else
         return
     d_open = kit.read_open()
     mine = {t: e for t, e in d_open.items() if e.get('session_id') == sid}
@@ -172,8 +197,8 @@ def main():
                purpose=d_sess.get('purpose'), visibility=visibility(d_sess), visibility_reason=reason(d_sess),
                needs_human=d_sess.get('needs_human'))
 
-    def say(l_ctx: list):  # these lines, plus the user's unread comments, next to the tool result or the prompt
-        txt = '\n'.join([x for x in l_ctx if x] + ([take_comments(sid, d_open)] if pending else []))
+    def say(l_ctx: list):  # these lines, the kit's notices and the user's unread comments, next to the tool result or the prompt
+        txt = '\n'.join([x for x in [notices] + l_ctx if x] + ([take_comments(sid, d_open)] if pending else []))
         if txt.strip():
             out({'hookSpecificOutput': {'hookEventName': event, 'additionalContext': txt}})
 
@@ -276,7 +301,8 @@ def main():
         return
 
     if event == 'Stop':
-        if pending and (txt := take_comments(sid, d_open)):
+        txt = '\n'.join(x for x in [notices, take_comments(sid, d_open) if pending else ''] if x)
+        if txt:
             out({'decision': 'block', 'reason': txt})
         if mine and not d_sess.get('needs_human') and not d_in.get('stop_hook_active'):
             l_t = [f'{t} ({(e.get("url") or "")[:60]})' for t, e in mine.items()]

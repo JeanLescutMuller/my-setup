@@ -36,10 +36,10 @@ def cli(name, *args, cwd=CWD, **env):
                           env={**ENV, **env}, cwd=cwd)
 
 
-def check(name, ok):
+def check(name, ok, detail=''):
     global n_fail, n_pass
     n_fail, n_pass = n_fail + (not ok), n_pass + bool(ok)
-    print(('PASS ' if ok else 'FAIL ') + name)
+    print(('PASS ' if ok else 'FAIL ') + name + ('' if ok or detail == '' else f'  {str(detail)[:300]}'))
 
 
 def decision(d):
@@ -106,10 +106,10 @@ check('authorize-tab --visibility unfocused accepted', cli('agent_chrome.py', 'a
 check('tabs_create allowed after the claim', decision(hook('PreToolUse', C + 'tabs_create_mcp')) is None)
 d = hook('PostToolUse', C + 'tabs_create_mcp', {}, [{'type': 'text', 'text': f'Created new tab. Tab ID: {T}'}] + tabs((T, 'New tab', '')))
 e = opened().get(str(T), {})
-check('open.json entry: fields in order', list(e) == ['ts', 'dt', 'opened_ts', 'opened_dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'message', 'reply_to'])
+check('open.json entry: fields in order', list(e) == ['ts', 'dt', 'opened_ts', 'opened_dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'expires_ts', 'message', 'reply_to'])
 check('open.json entry: session UUID, project = git toplevel, profile, purpose, no job', e.get('session_id') == 'sess-A' and e.get('project') == 'proj-x'
       and e.get('profile') == 'Claude - general' and e.get('purpose') == 'find Amazon RIVR engineers' and e.get('job') is None and e.get('reply_to', '').endswith('asm resume sess-A'))
-check('history line: fields in order, ts first', list(history()[-1]) == ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'message', 'reply_to'])
+check('history line: fields in order, ts first', list(history()[-1]) == ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'expires_ts', 'message', 'reply_to'])
 check('Claude is told the tab was recorded', 'recorded' in ctx(d))
 d = hook('PreToolUse', C + 'tabs_create_mcp')
 check('second tab refused: reuse tab N', decision(d) == 'deny' and f'tab {T}' in reason(d))
@@ -282,6 +282,60 @@ ps.write_text('')
 r = cli('agent_chrome.py', 'open-profile-window')
 check('window: Chrome not running -> refused (never starts it: it would reopen the user\'s own profile)', r.returncode != 0 and 'not running' in r.stderr)
 ps.write_text(ps_saved)
+# Expiry (part C, 1 Nov 2026): a tab kept for a human is closed after NEEDS_HUMAN_TTL; the record says "expired"
+# and the session is told at its next hook call. The native host is run as Chrome would run it (stdin/stdout frames).
+import struct  # noqa: E402
+TE = 777
+cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'a login', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-E')
+hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'ok'}], session_id='sess-E')
+hook('PostToolUse', C + 'tabs_create_mcp', {}, tabs((TE, 'New tab', '')), session_id='sess-E')
+t0 = int(time.time())
+r = cli('agent_chrome.py', 'mark-as-needing-human', 'log in', CLAUDE_CODE_SESSION_ID='sess-E', CHROME_NEEDS_HUMAN_TTL='3')
+e = opened().get(str(TE), {})
+check('mark-as-needing-human: the tab gets its deadline (now + TTL), the history row too, and the agent is told',
+      t0 + 3 <= (e.get('expires_ts') or 0) <= t0 + 5 and history()[-1]['expires_ts'] == e['expires_ts'] and 'closes it at' in r.stdout, (e.get('expires_ts'), t0, r.stdout))
+hook('PostToolUse', C + 'navigate', {'tabId': TE}, tabs((TE, 'x', 'https://x.ch/login')), session_id='sess-E')
+check('a later event keeps the deadline', opened()[str(TE)]['expires_ts'] == e['expires_ts'])
+cli('agent_chrome.py', 'mark-as-human-done', CLAUDE_CODE_SESSION_ID='sess-E')
+check('mark-as-human-done clears the deadline', opened()[str(TE)]['expires_ts'] is None)
+kit_env = {**ENV, 'CHROME_NEEDS_HUMAN_TTL': '7200'}
+r = cli('agent_chrome.py', 'mark-as-needing-human', 'log in again', CLAUDE_CODE_SESSION_ID='sess-E', CHROME_NEEDS_HUMAN_TTL='2')
+check('marked again: a new deadline', opened()[str(TE)]['expires_ts'] and opened()[str(TE)]['needs_human'] == 'log in again')
+
+
+def frame(obj):
+    b = json.dumps(obj).encode()
+    return struct.pack('<I', len(b)) + b
+
+
+host = subprocess.Popen([sys.executable, '-IB', str(KIT / 'native_host.py')], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=ENV)
+host.stdin.write(frame({'hello': 1}))
+host.stdin.flush()
+l_msg, t_end = [], time.time() + 8
+while time.time() < t_end and not any('expire' in m for m in l_msg):
+    n = struct.unpack('<I', host.stdout.read(4))[0]
+    l_msg.append(json.loads(host.stdout.read(n)))
+notes0 = next((m['notes'] for m in l_msg if 'notes' in m), {})
+check('host: the note carries the deadline (the bar shows it)', notes0.get(str(TE), {}).get('expires_ts') == opened()[str(TE)]['expires_ts'])
+check('host: past the deadline, asks the extension to close the tab, once', [m.get('expire') for m in l_msg if 'expire' in m] == [[TE]], l_msg[-1:])
+host.stdin.write(frame({'expired': {'tab_id': TE, 'url': 'https://x.ch/login'}}))   # the extension closed it
+host.stdin.flush()
+time.sleep(1.5)
+host.kill()
+h = history()[-1]
+check('expired: the tab leaves open.json, the history says "expired" with the need', str(TE) not in opened()
+      and h['event'] == 'expired' and h['tab_id'] == TE and h['needs_human'] == 'log in again', h)
+check('expired: the session\'s need is cleared', json.loads((tmp / 'state/sessions/sess-E.json').read_text()).get('needs_human') is None)
+d = hook('PreToolUse', 'Bash', {'command': 'ls'}, session_id='sess-E')
+check('the session is told at its next hook call (a Bash call too): tab N expired, the human didn\'t act in <TTL>',
+      f'your tab {TE}' in ctx(d) and 'expired' in ctx(d) and "didn't act in 2 s" in ctx(d) and 'log in again' in ctx(d), ctx(d))
+check('told once', hook('PreToolUse', 'Bash', {'command': 'ls'}, session_id='sess-E') == {})
+(tmp / f'state/sessions/sess-Z.notices.jsonl').write_text(json.dumps({'tab_id': 9, 'url': 'u', 'needs_human': 'x', 'after_s': 7200, 'dt': '2026-11-01T10:00:00Z'}) + '\n')
+d = hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-Z')   # not authorized: refused
+check('a refusal carries the notice too (never lost)', decision(d) == 'deny' and 'your tab 9' in reason(d), d)
+(tmp / f'state/sessions/sess-E.notices.jsonl').write_text(json.dumps({'tab_id': 9, 'url': 'u', 'needs_human': 'x', 'after_s': 7200, 'dt': '2026-11-01T10:00:00Z'}) + '\n')
+d = hook('Stop', session_id='sess-E', stop_hook_active=False)
+check('at Stop: blocked with the notice, so the agent tells the user', d.get('decision') == 'block' and "didn't act in 2 h" in d.get('reason', ''), d)
 check('hook never failed (no hook-errors.log)', not (tmp / 'state/hook-errors.log').exists())
 print(f'{n_pass} passed, {n_fail} failed; state: {tmp / "state"}')
 sys.exit(bool(n_fail))

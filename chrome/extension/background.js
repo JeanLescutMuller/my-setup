@@ -5,6 +5,8 @@
 // appends them to comments.jsonl for the session. Each project's agent tab groups go to that project's window
 // (place.js: moved with chrome.tabGroups.move, never the user's tabs); the profile's windows are reported to the host
 // (windows/<profile>.json: agent-chrome open-profile-window opens a window only for a profile without one).
+// A tab kept for a human past its deadline (note.expires_ts, 2 h): the host says {expire: [tabId]}, the extension of
+// the profile that holds it closes it (in the background, no focus) and answers {expired}; the host records it.
 importScripts("place.js");
 const HOST = "com.jeanlescut.agent_tab_notes";
 // Sites with strong bot checks: the bar only when the human must act there (the badge always).
@@ -60,6 +62,14 @@ async function apply(newNotes) {
   Place.place(notes);
 }
 
+async function expire(ids) {   // only tabs of this profile: chrome.tabs.get fails for another profile's
+  for (const id of ids) {
+    let tab; try { tab = await chrome.tabs.get(Number(id)); } catch { continue; }
+    try { await chrome.tabs.remove(tab.id); } catch (e) { console.warn("expire", id, e); continue; }
+    if (port) port.postMessage({ expired: { tab_id: tab.id, url: tab.url } });
+  }
+}
+
 async function report() {   // this profile's windows -> the host -> windows/<profile>.json
   const { map, profile } = await Place.local();
   if (port && profile) port.postMessage({ windows: { profile, windows: await Place.normalIds(), projects: map } });
@@ -69,7 +79,7 @@ Place.setReport(report);
 function connect() {
   if (port) return;
   try { port = chrome.runtime.connectNative(HOST); } catch (e) { console.warn("native host", e); return; }
-  port.onMessage.addListener(m => { if (m.notes) apply(m.notes); });
+  port.onMessage.addListener(m => { if (m.notes) apply(m.notes); if (m.expire) expire(m.expire); });
   port.onDisconnect.addListener(() => { console.warn("native host gone", chrome.runtime.lastError?.message); port = null; setTimeout(connect, 5000); });
   port.postMessage({ hello: 1 });   // the host then sends {notes} at once and after every change of the record
   report();

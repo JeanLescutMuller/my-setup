@@ -192,6 +192,32 @@ def windows(ctx, ctl, base):
     print('      placeLog:', [(x.get('action'), x.get('project'), x.get('tab')) for x in log][-8:])
 
 
+def expiry(ctx, ctl, base):
+    """8. A tab kept for a human past its deadline: the extension closes it, the host records "expired" and leaves the
+    session a notice (part C, 1 Nov 2026). The deadline is shortened with $CHROME_NEEDS_HUMAN_TTL (the marking process)."""
+    sid = 'eeee0000-0000-4000-8000-000000000001'
+    pg = ctx.new_page()
+    pg.goto(f'{base}/login')
+    tid = max(t['id'] for t in ctl.evaluate('chrome.tabs.query({})'))
+    kit.record([{'event': 'open', 'tab_id': tid, 'url': f'{base}/login', 'profile': 'Claude - general', 'device_id': GEN}],
+               {'session_id': sid, 'cwd': str(PROJ)})
+    r = subprocess.run(['/usr/bin/python3', '-I', str(KIT / 'agent_chrome.py'), 'authorize-tab', 'log in', '--visibility',
+                        'unfocused', '--visibility-reason', 'a login', '--project', 'job-applications'], cwd=PROJ,
+                       capture_output=True, text=True, env={**os.environ, 'CLAUDE_CODE_SESSION_ID': sid})
+    r = subprocess.run(['/usr/bin/python3', '-I', str(KIT / 'agent_chrome.py'), 'mark-as-needing-human', 'log in'], cwd=PROJ,
+                       capture_output=True, text=True, env={**os.environ, 'CLAUDE_CODE_SESSION_ID': sid, 'CHROME_NEEDS_HUMAN_TTL': '4'})
+    t0 = time.time()
+    while time.time() - t0 < 12 and str(tid) in kit.read_open():
+        time.sleep(0.5)
+    still = [t['id'] for t in ctl.evaluate('chrome.tabs.query({})') if t['id'] == tid]
+    h = [json.loads(x) for f in sorted(kit.HISTORY.glob('*.jsonl')) for x in f.read_text().splitlines()]
+    last = [x for x in h if x['tab_id'] == tid][-1]
+    notice = kit.SESSIONS / f'{sid}.notices.jsonl'
+    check('8. needs human past its deadline (4 s here, 2 h for real): the extension closed the tab, the record says '
+          '"expired", the session has a notice', not still and last['event'] == 'expired' and notice.exists()
+          and str(tid) not in kit.read_open(), (r.stdout[-120:], still, last['event'], round(time.time() - t0, 1)))
+
+
 def main():
     profile = SCRATCH / 'profile'
     shutil.rmtree(profile, ignore_errors=True)
@@ -206,6 +232,10 @@ def main():
     base = f'http://127.0.0.1:{srv.server_port}'
     proc = subprocess.Popen([sys.argv[1], '--headless=new', f'--user-data-dir={profile}', '--remote-debugging-port=0',
                              '--no-first-run', '--no-default-browser-check', '--window-size=1280,800',
+                             # 1 Nov 2026 19:20: without these, Chrome for Testing 152 headless never finished loading a
+                             # page on this Mac (it had at 19:11); the launcher's branded Chrome was not affected
+                             '--disable-renderer-backgrounding', '--disable-background-timer-throttling',
+                             '--disable-backgrounding-occluded-windows',
                              f'--load-extension={EXT}', f'--disable-extensions-except={EXT}', 'about:blank'],
                             stdout=subprocess.DEVNULL, stderr=open(SCRATCH / 'chrome.stderr.log', 'w'))
     try:
@@ -249,8 +279,9 @@ def main():
             opened = kit.read_open()[str(tid)]['opened_ts']
             day = time.strftime('%d', time.localtime(opened))
             check('bar on top, red, badge "!"', bar_on_top(page) and badge(tid) == '!')
-            check('bar fields: opened (date + time), session UUID, project, purpose, NEEDS HUMAN; no job',
-                  all(s in txt for s in ['opened', day, SID, 'job-applications', 'Apply to job 4312', 'NEEDS HUMAN: solve the captcha'])
+            check('bar fields: opened (date + time), session UUID, project, purpose, visibility, NEEDS HUMAN with its deadline; no job',
+                  all(s in txt for s in ['opened', day, SID, 'job-applications', 'Apply to job 4312', 'visibility focused',
+                                         'NEEDS HUMAN: solve the captcha', 'if nobody acts'])
                   and 'job ' not in txt.replace('job-applications', '').replace('to job', ''), txt)
             covered = page.evaluate(MEASURE)
             check('nothing covered (page and its fixed header pushed down)', covered == [], covered)
@@ -337,6 +368,7 @@ def main():
             check('close: bar gone, page margin back to 0', not page.evaluate("!!document.querySelector('agent-tab-note')")
                   and page.evaluate('getComputedStyle(document.documentElement).marginTop') == '0px' and badge(tid) == '')
 
+            expiry(ctx, ctl, base)
             windows(ctx, ctl, base)
     finally:
         proc.terminate()

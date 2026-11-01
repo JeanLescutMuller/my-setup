@@ -11,6 +11,11 @@ while the extension runs: ts, dt, pid, profile, windows (ids), projects ({projec
 the extension goes (agent-chrome open-profile-window reads it: does this profile have a window?).
 Sends the extension {"notes": {tab_id: entry + "thread"}} at start and after every change of those files: only
 Claude in Chrome tabs (device_id set) opened since the user's Chrome started (Chrome reuses tab ids after a restart).
+Expiry (the deadline of a tab kept for a human, expires_ts in open.json; chrome_kit.NEEDS_HUMAN_TTL): once past it,
+sends {"expire": [tab_id]}; the extension that holds the tab closes it and answers {"expired": {tab_id, url}}; this
+host then records the event "expired" (the tab leaves open.json), clears the session's need, and appends a notice to
+sessions/<id>.notices.jsonl, which hook.py hands to the session at its next tool call or prompt. The timer is here,
+not in the hook: a session waiting for its human makes no tool call, so its hook would not run before it resumes.
 Python 3.9 (macOS /usr/bin/python3), standard library only.
 """
 from __future__ import annotations
@@ -99,6 +104,39 @@ def add_comment(d: dict):
             f.write(json.dumps(row, ensure_ascii=False) + '\n')
 
 
+def expired(d: dict):
+    """The extension closed a tab past its deadline: record it "expired", tell its session."""
+    e = kit.read_open().get(str(d.get('tab_id')))
+    if not e or not e.get('needs_human'):
+        return                                        # closed or answered meanwhile: nothing expired
+    sid = e.get('session_id')
+    l_r = kit.record([{**{k: e.get(k) for k in kit.FIELDS if k not in ('ts', 'dt')}, 'event': 'expired', 'ts': None,
+                       'url': d.get('url') or e.get('url')}])
+    if not sid:
+        return
+    f_sess = kit.SESSIONS / f'{sid}.json'
+    if f_sess.exists():
+        kit.update_session(sid, needs_human=None)
+    f = kit.SESSIONS / f'{sid}.notices.jsonl'
+    f.parent.mkdir(parents=True, exist_ok=True)
+    n = {'ts': l_r[0]['ts'], 'dt': l_r[0]['dt'], 'event': 'expired', 'tab_id': e.get('tab_id'), 'url': l_r[0]['url'],
+         'needs_human': e.get('needs_human'), 'expires_ts': e.get('expires_ts'),
+         'after_s': (e.get('expires_ts') or 0) - (need_since(e) or 0) if need_since(e) else None}
+    with kit.locked(f):
+        with open(f, 'a') as fh:
+            fh.write(json.dumps(n, ensure_ascii=False) + '\n')
+
+
+def need_since(e: dict) -> int | None:
+    """When the tab's current need was recorded: its session's last needs_human event with that text."""
+    ts = None
+    for f in history_files():
+        for r in jsonl(f):
+            if r.get('event') == 'needs_human' and r.get('session_id') == e.get('session_id') and r.get('needs_human') == e.get('needs_human'):
+                ts = r.get('ts')
+    return ts
+
+
 def write_windows(d: dict):
     """The extension's report of its profile's windows -> windows/<profile>.json (one profile per extension)."""
     profile = str(d.get('profile') or '')
@@ -133,14 +171,21 @@ def main():
                 add_comment(m['comment'])
             if m.get('windows'):
                 write_windows(m['windows'])
+            if m.get('expired'):
+                expired(m['expired'])
 
     threading.Thread(target=reader, daemon=True).start()
-    last = None
+    last, d_notes, s_sent = None, {}, set()
     while True:
         now = stamp()
         if now != last:
-            last = now
-            send({'notes': notes()})
+            last, d_notes = now, notes()
+            send({'notes': d_notes})
+        l_due = [int(k) for k, e in d_notes.items() if e.get('needs_human') and e.get('expires_ts')
+                 and e['expires_ts'] <= time.time() and (k, e['expires_ts']) not in s_sent]
+        if l_due:                                     # once per tab and deadline: the extension that holds it closes it
+            s_sent |= {(str(k), d_notes[str(k)]['expires_ts']) for k in l_due}
+            send({'expire': l_due})
         time.sleep(0.5)
 
 

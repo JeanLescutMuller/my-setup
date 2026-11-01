@@ -2,7 +2,7 @@
 # Removes what modules/agent_links.sh deploys: the skill links
 # in ~/.claude/skills and ~/.agents/skills
 # (only links that point into ~/opt/my-setup), then the read-only copies
-# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc; the Hammerspoon config link (modules/hammerspoon.sh); the Chrome kit (modules/chrome_kit.sh: its code, chrome-claim, chrome-who, and its hook groups in ~/.claude/settings.json; its record in ~/opt/my-setup/state/chrome/ is kept).
+# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc; the Hammerspoon config link (modules/hammerspoon.sh); the Chrome kit (modules/chrome_kit.sh: its code, chrome-claim, chrome-who, the Agent tab notes extension and its native host manifest, and its hook groups in ~/.claude/settings.json; its record in ~/opt/my-setup/state/chrome/ is kept).
 # Dotfiles, the shell rc block, git config and the tools are left alone.
 #
 # Usage: bash uninstall.sh
@@ -77,9 +77,15 @@ os.replace(path + '.tmp', path)
 PYEOF
     _remove_link "$HOME/.local/bin/chrome-claim" "$OPT_DIR/chrome/chrome_claim.py"
     _remove_link "$HOME/.local/bin/chrome-who" "$OPT_DIR/chrome/chrome_who.py"
-    for f in hook.py chrome_kit.py chrome_claim.py chrome_who.py launch_headless.py; do
+    _nmh="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.jeanlescut.agent_tab_notes.json"
+    grep -q "$OPT_DIR/chrome/native_host.py" "$_nmh" 2>/dev/null && rm "$_nmh" && installed "removed $_nmh"
+    for f in hook.py chrome_kit.py chrome_claim.py chrome_who.py launch_headless.py native_host.py; do
         [ -f "$OPT_DIR/chrome/$f" ] && rm "$OPT_DIR/chrome/$f" && installed "removed $OPT_DIR/chrome/$f"
     done
+    for f in manifest.json background.js push.js note.js sidepanel.html sidepanel.js; do
+        [ -f "$OPT_DIR/chrome/extension/$f" ] && rm "$OPT_DIR/chrome/extension/$f" && installed "removed $OPT_DIR/chrome/extension/$f"
+    done
+    [ -d "$OPT_DIR/chrome/extension" ] && rmdir "$OPT_DIR/chrome/extension" 2>/dev/null && installed "removed $OPT_DIR/chrome/extension"
     [ -d "$OPT_DIR/chrome" ] && rmdir "$OPT_DIR/chrome" 2>/dev/null && installed "removed $OPT_DIR/chrome"
     warn "kept $OPT_DIR/state/chrome (the record of what agents opened)"
 fi

@@ -2,7 +2,12 @@
 # The Chrome kit (macOS only): every agent's Chrome use recorded and its rules enforced.
 #
 #   chrome/*.py (not tests/)  ->  ~/opt/my-setup/chrome/      hook.py, chrome_kit.py, chrome_claim.py, chrome_who.py,
-#                                                             launch_headless.py
+#                                                             launch_headless.py, native_host.py
+#   chrome/extension/         ->  ~/opt/my-setup/chrome/extension/   the "Agent tab notes" extension: the user loads
+#                                                             it once per agent profile (chrome://extensions, Load unpacked)
+#   ~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.jeanlescut.agent_tab_notes.json
+#                                                             lets that extension (fixed id) start native_host.py; Chrome's
+#                                                             own folder, read by every profile: no profile is touched
 #   ~/.local/bin/chrome-claim ->  ~/opt/my-setup/chrome/chrome_claim.py
 #   ~/.local/bin/chrome-who   ->  ~/opt/my-setup/chrome/chrome_who.py
 #   ~/opt/my-setup/state/chrome/                              open.json, history/, comments.jsonl, sessions/ (kept on
@@ -19,6 +24,9 @@ else
     _ck_dst="$HOME/opt/my-setup/chrome"
     _ck_state="$HOME/opt/my-setup/state/chrome"
     _ck_bins=("chrome_claim.py:chrome-claim" "chrome_who.py:chrome-who")
+    _ck_ext_id="hfnfcdbehfbggjaccimmnolmhdkbfdie"      # from the "key" in chrome/extension/manifest.json
+    _ck_nmh="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.jeanlescut.agent_tab_notes.json"
+    _ck_nmh_text="$(printf '{\n  "name": "com.jeanlescut.agent_tab_notes",\n  "description": "Agent tab notes: the Chrome kit record on the tab",\n  "path": "%s",\n  "type": "stdio",\n  "allowed_origins": ["chrome-extension://%s/"]\n}' "$_ck_dst/native_host.py" "$_ck_ext_id")"
 
     _ck_same=true
     for f in "$_ck_src"/*.py; do
@@ -31,11 +39,18 @@ else
         [ "$(readlink "$HOME/.local/bin/${entry#*:}" 2>/dev/null)" = "$_ck_dst/${entry%%:*}" ] || _ck_same=false
     done
     [ -d "$_ck_state" ] || _ck_same=false
+    for f in "$_ck_src"/extension/*; do
+        diff -q "$f" "$_ck_dst/extension/${f##*/}" >/dev/null 2>&1 || _ck_same=false
+    done
+    for f in "$_ck_dst"/extension/*; do
+        [ -e "$f" ] && [ ! -f "$_ck_src/extension/${f##*/}" ] && _ck_same=false
+    done
+    [ "$(cat "$_ck_nmh" 2>/dev/null)" = "$_ck_nmh_text" ] || _ck_same=false
 
     if $_ck_same; then
-        ok "$_ck_dst, chrome-claim, chrome-who"
+        ok "$_ck_dst, chrome-claim, chrome-who, extension, native host"
     elif [ "$INSTALL" = "false" ]; then
-        skip "$_ck_dst, chrome-claim, chrome-who"
+        skip "$_ck_dst, chrome-claim, chrome-who, extension, native host"
     else
         mkdir -p "$_ck_dst" "$_ck_state" "$HOME/.local/bin"
         for f in "$_ck_dst"/*.py; do                                   # left chrome/: removed, one by one
@@ -45,10 +60,21 @@ else
         for f in "$_ck_src"/*.py; do
             cp "$f" "$_ck_dst/.${f##*/}.tmp" && mv "$_ck_dst/.${f##*/}.tmp" "$_ck_dst/${f##*/}"
         done
-        chmod +x "$_ck_dst"/hook.py "$_ck_dst"/chrome_claim.py "$_ck_dst"/chrome_who.py "$_ck_dst"/launch_headless.py
+        chmod +x "$_ck_dst"/hook.py "$_ck_dst"/chrome_claim.py "$_ck_dst"/chrome_who.py "$_ck_dst"/launch_headless.py \
+            "$_ck_dst"/native_host.py
+        mkdir -p "$_ck_dst/extension"
+        for f in "$_ck_dst"/extension/*; do                         # left chrome/extension/: removed, one by one
+            [ -e "$f" ] && [ ! -f "$_ck_src/extension/${f##*/}" ] && rm "$f" && installed "removed $f"
+        done
+        for f in "$_ck_src"/extension/*; do
+            cp "$f" "$_ck_dst/extension/.${f##*/}.tmp" && mv "$_ck_dst/extension/.${f##*/}.tmp" "$_ck_dst/extension/${f##*/}"
+        done
+        mkdir -p "${_ck_nmh%/*}"
+        printf '%s\n' "$_ck_nmh_text" > "$_ck_nmh.tmp" && mv "$_ck_nmh.tmp" "$_ck_nmh"
         for entry in "${_ck_bins[@]}"; do
             ln -sfn "$_ck_dst/${entry%%:*}" "$HOME/.local/bin/${entry#*:}"
         done
-        installed "$_ck_dst, chrome-claim, chrome-who"
+        installed "$_ck_dst, chrome-claim, chrome-who, extension, native host"
+        warn "new extension code: reload \"Agent tab notes\" in chrome://extensions of each agent profile (first time: Load unpacked $_ck_dst/extension)"
     fi
 fi

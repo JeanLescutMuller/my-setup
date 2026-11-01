@@ -1,0 +1,30 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Agent tab note</title>
+<style>
+  :root { color-scheme: light dark; --me: #d3e3fd; --agent: #e8eaed; --ink: #1f1f1f; }
+  @media (prefers-color-scheme: dark) { :root { --me: #0842a0; --agent: #3c4043; --ink: #e8eaed; } }
+  body { font: 14px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; margin: 12px; background: Canvas; color: CanvasText; }
+  .action { background: #b3261e; color: #fff; padding: 10px; border-radius: 8px; font-size: 16px; font-weight: 700; }
+  h2 { font-size: 13px; text-transform: uppercase; opacity: .7; margin: 16px 0 6px; }
+  .msg { padding: 6px 10px; border-radius: 10px; margin: 4px 0; max-width: 85%; color: var(--ink); }
+  .msg.you { background: var(--me); margin-left: auto; }
+  .msg.agent { background: var(--agent); }
+  .msg small { display: block; opacity: .65; font-size: 11px; }
+  form { display: flex; gap: 6px; margin-top: 8px; }
+  textarea { flex: 1; font: inherit; min-height: 44px; }
+  button { font: inherit; }
+  #status { font-size: 12px; opacity: .7; min-height: 1em; }
+  table { border-collapse: collapse; width: 100%; }
+  td { border-top: 1px solid #8884; padding: 3px 6px; vertical-align: top; word-break: break-all; font-size: 12px; }
+  td:first-child { opacity: .7; white-space: nowrap; word-break: normal; }
+</style></head>
+<body>
+  <div id="action"></div>
+  <h2>Messages with the agent</h2>
+  <div id="thread"><small>No messages yet.</small></div>
+  <form id="send"><textarea id="text" placeholder="Message to the agent about this tab"></textarea><button>Send</button></form>
+  <div id="status"></div>
+  <h2>Who opened this tab</h2>
+  <div id="out">No agent note for this tab.</div>
+  <script src="sidepanel.js"></script>
+</body></html>

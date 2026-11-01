@@ -288,14 +288,14 @@ footer{color:var(--muted);font-size:12.5px}
   <div class="lane cln"><header><h3>2 · Which profile?</h3><small>security</small></header><ul>
     <li class="req" data-s="s-ok"><span class="id">2a</span><span class="t">Each profile belongs to its projects</span><span class="d">Claude - LinkedIn → job-applications only · Claude - Facebook → marketplace-seller only · Claude - general → any project. Enforced by the hook.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
     <li class="req" data-s="s-ok"><span class="id">2b</span><span class="t">Never your profile</span><span class="d">Your Default profile (Bitwarden) is refused, by the hook and by the file rules.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">2c</span><span class="t">One profile per session</span><span class="d">Once a session picked a profile it can't switch: an honest agent reaches LinkedIn or a general site, never both in one session.</span><span class="meta"><span class="pill s-build">being built</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">2c</span><span class="t">One profile per session</span><span class="d">Once a session picked a profile it can't switch: an honest agent reaches LinkedIn or a general site, never both in one session.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
     <li class="req" data-s="s-ok"><span class="id">2d</span><span class="t">Limit: a malicious agent</span><span class="d">Profiles stop honest mistakes, not an agent that bypasses hooks through the shell. What protects you there: no vault in any agent profile, each job's secrets in its own <span class="mono">~/.config/&lt;agent&gt;/</span>.</span><span class="meta"><span class="pill s-ok">stated</span></span></li>
   </ul></div>
 
   <div class="lane run"><header><h3>3 · Headless, invisible?</h3><small>your comfort</small></header><ul>
     <li class="req" data-s="s-ok"><span class="id">3a</span><span class="t">Headless by default</span><span class="d">Scripts start Chrome only through the kit's launcher: marketplace-seller, robotics-radar, smart-home tests; the password layer is recorded and watched.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
     <li class="req" data-s="s-ok"><span class="id">3b</span><span class="t">Visible only with a stated reason</span><span class="d">A Claude in Chrome tab (always visible) needs <span class="mono">--needs-human "what you must do"</span> or <span class="mono">--visible-because "why headless can't"</span>.</span><span class="meta"><span class="pill s-ok">done</span></span></li>
-    <li class="req" data-s="s-build"><span class="id">3c</span><span class="t">A killed script never leaves Chrome running</span><span class="d">A watchdog quits the launcher's Chrome when the script that started it dies (a job timeout leaves it today).</span><span class="meta"><span class="pill s-build">being built</span></span></li>
+    <li class="req" data-s="s-ok"><span class="id">3c</span><span class="t">A killed script never leaves Chrome running</span><span class="d">A watchdog quits the launcher's Chrome when the script that started it dies (tested: quit and recorded within 20 s of a kill).</span><span class="meta"><span class="pill s-ok">done</span></span></li>
     <li class="req" data-s="s-inv"><span class="id">3d</span><span class="t">Scheduled jobs on logged-in sites go headless</span><span class="d">Prefer a headless Chrome with its own data folder, logged in once by you (as marketplace-seller does), over a visible profile.</span><span class="meta"><span class="pill s-inv">to discuss</span></span></li>
   </ul></div>
 
@@ -360,8 +360,8 @@ footer{color:var(--muted);font-size:12.5px}
       <li><span class="pill s-ok">done 1 Nov</span> <b>Rules.</b> CLAUDE.md paragraph; skills chrome-headless and chrome-leftovers.</li>
       <li><span class="pill s-ok">done 1 Nov</span> <b>job-applications.</b> Recorded, "YOUR TURN" on a kept tab, no duplicates, BLIND.</li>
       <li><span class="pill s-ok">done 1 Nov</span> <b>Scripts.</b> marketplace-seller, robotics-radar, smart-home, password layer; trading-bot's render no longer quits every Chrome.</li>
-      <li><span class="pill s-build">being built</span> <b>Kit fixes.</b> One profile per session (2c), watchdog (3c), extra Chrome options, busy data folder, a false refusal on text that only mentions Chrome.</li>
-      <li><span class="pill s-inv">being tested</span> <b>Questions 4 and 5.</b> One agent window per project, never in front, on the project's desktop.</li>
+      <li><span class="pill s-ok">done 1 Nov</span> <b>Kit fixes.</b> One profile per session (2c), watchdog (3c), extra Chrome options, busy data folder, a false refusal on text that only mentions Chrome.</li>
+      <li><span class="pill s-inv">tested in part</span> <b>Questions 4 and 5.</b> Agent actions never take focus; tabs already go into the profile's last-used window; a window cannot be moved to another desktop by code (macOS 26). Next: the extension moves each session's tabs into its project's window; a kit command opens a profile window in the background.</li>
     </ol>
   </div>
   <div class="card">

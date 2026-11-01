@@ -36,7 +36,7 @@ CLAIM = os.environ.get('CHROME_CLAIM_CMD', 'chrome-claim')
 # deviceId -> (profile name, folders of the only projects allowed to use it, or None = any): AGENTS_LOCAL.md "Chrome profiles"
 D_DEVICE = {
     '331a94e7-f123-4e09-a755-cdc63980187f': ('Claude - general', None),
-    'f16617c3-d0dc-425b-a7a4-d925eec10bf5': ('Claude - auto-job-apply', ('/dev/job-applications', '/opt/job-applications')),
+    'f16617c3-d0dc-425b-a7a4-d925eec10bf5': ('Claude - LinkedIn', ('/dev/job-applications', '/opt/job-applications')),
     'db5922d3-1713-4df0-a025-1ac608fac5f1': ('Claude - Facebook', ('/dev/marketplace-seller', '/opt/marketplace-seller')),
 }
 DEFAULT_PREFIX = '7ffa990a'  # Chrome's Default profile: the user's own, with their password vault. Never.

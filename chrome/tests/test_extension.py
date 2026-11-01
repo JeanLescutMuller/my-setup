@@ -139,7 +139,7 @@ def main():
             page.goto(f'{base}/apply')
             tid = newest()
             page.screenshot(path=str(SHOTS / 'ext_bar_before.png'))
-            kit.record([{'event': 'open', 'tab_id': tid, 'url': f'{base}/apply', 'profile': 'Claude - auto-job-apply',
+            kit.record([{'event': 'open', 'tab_id': tid, 'url': f'{base}/apply', 'profile': 'Claude - LinkedIn',
                          'device_id': GEN}], {'session_id': SID, 'cwd': str(PROJ)})
             claim('--purpose', 'Apply to job 4312 (Data Engineer, Zurich)', '--needs-human', 'solve the captcha')
             time.sleep(2)
@@ -212,7 +212,7 @@ def main():
                 lpage.goto('https://www.linkedin.com/jobs/search?keywords=engineer&location=Zurich', wait_until='domcontentloaded', timeout=30000)
                 lpage.wait_for_timeout(2000)
                 ltid = newest()
-                kit.record([{'event': 'open', 'tab_id': ltid, 'url': lpage.url, 'profile': 'Claude - auto-job-apply', 'device_id': GEN,
+                kit.record([{'event': 'open', 'tab_id': ltid, 'url': lpage.url, 'profile': 'Claude - LinkedIn', 'device_id': GEN,
                              'purpose': 'read job offers'}], {'session_id': SID2, 'cwd': str(PROJ)})
                 time.sleep(2)
                 check('LinkedIn, nothing to do: no bar, page untouched', not bar_on_top(lpage)

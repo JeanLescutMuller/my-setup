@@ -11,7 +11,7 @@ l_ok = [
     ('run1: the claim was made by the hook\'s own session ($CLAUDE_CODE_SESSION_ID)', any(h['event'] == 'claim' and h['session_id'] == sid['run1'] for h in l_h)),
     ('hooks got tool_response as the MCP content list', any(isinstance(d.get('tool_response'), list) for d in l_in)),
     # the agent may say what the user must do up front (--needs-human) or after the Stop reminder: both are right
-    ('run2: the tab left open says what the user must do, or was closed', 'close' in ev('run2') or any(
+    ('run2: the tab left open says what the human must do (needs human), or was closed', 'close' in ev('run2') or any(
         e.get('session_id') == sid['run2'] and e.get('needs_human') for e in json.load(open(out / 'state/open.json')).values())),
     ('run3: the comment written mid-session got an answer on the tab', any(h['event'] == 'message' and h['session_id'] == sid['run3'] for h in l_h)),
     ('run4: the comment for the idle session got an answer', sum(h['event'] == 'message' and h['session_id'] == sid['run3'] for h in l_h) >= 2),

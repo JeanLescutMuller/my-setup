@@ -4,7 +4,7 @@
 // and the side panel (details, the thread with the agent, a comment box). Comments go back to the host, which
 // appends them to comments.jsonl for the session. Each project's agent tab groups go to that project's window
 // (place.js: moved with chrome.tabGroups.move, never the user's tabs); the profile's windows are reported to the host
-// (windows/<profile>.json: chrome-claim window opens a window only for a profile without one).
+// (windows/<profile>.json: agent-chrome open-profile-window opens a window only for a profile without one).
 importScripts("place.js");
 const HOST = "com.jeanlescut.agent_tab_notes";
 // Sites with strong bot checks: the bar only when the human must act there (the badge always).
@@ -26,7 +26,7 @@ async function show(tabId) {
   const [text, color] = !note ? ["", "#5f6368"] : action ? ["!", "#d93025"] : note.event === "done" ? ["✓", "#188038"] : ["AI", "#5f6368"];
   await chrome.action.setBadgeText({ tabId, text }).catch(() => {});
   await chrome.action.setBadgeBackgroundColor({ tabId, color }).catch(() => {});
-  await chrome.action.setTitle({ tabId, title: note ? `${action ? "YOUR TURN: " + note.needs_human + "\n" : ""}${note.project || ""} · ${note.purpose || ""}` : "Agent tab notes" }).catch(() => {});
+  await chrome.action.setTitle({ tabId, title: note ? `${action ? "NEEDS HUMAN: " + note.needs_human + "\n" : ""}${note.project || ""} · ${note.purpose || ""}` : "Agent tab notes" }).catch(() => {});
   await chrome.sidePanel.setOptions({ tabId, path: `sidepanel.html?tabId=${tabId}`, enabled: true }).catch(() => {});
   let tab; try { tab = await chrome.tabs.get(tabId); } catch { return; }
   chrome.tabs.sendMessage(tabId, { type: "note", note: forPage(note, tab.url) }).catch(() => {});  // chrome:// pages: badge only

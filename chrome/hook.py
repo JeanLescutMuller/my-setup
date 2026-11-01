@@ -7,15 +7,15 @@ Installed by modules/claude_config.sh (PreToolUse on `mcp__claude-in-chrome__.*`
 | Event | Tool | Does |
 |---|---|---|
 | PreToolUse | select_browser, switch_browser | refuses Chrome's Default profile (the user's own), an unknown deviceId, a profile of another project |
-| PreToolUse | tabs_create_mcp, navigate, browser_batch with a navigate, tabs_context_mcp createIfEmpty | refuses until the session ran `chrome-claim --purpose … (--needs-human … or --visible-because …)`; a second tabs_create_mcp is refused ("reuse tab N") |
+| PreToolUse | tabs_create_mcp, navigate, browser_batch with a navigate, tabs_context_mcp createIfEmpty | refuses until the session ran `agent-chrome authorize-tab "<why>" (--needs-human … or --visible-because …)`; a second tabs_create_mcp is refused ("reuse tab N") |
 | PreToolUse | Bash | refuses a visible Chrome started from the shell (`open -a "Google Chrome"`, `--profile-directory`, the binary without --headless) |
 | PostToolUse | any Claude in Chrome tool | its "Available tabs" list corrects open.json: new tab → open, new URL → navigate, gone → close |
 | UserPromptSubmit, PreToolUse, PostToolUse (Chrome) | - | the user's unread comments from the tab → Claude (additionalContext) |
-| Stop | - | unread comments → block, so Claude answers; else, once per stop: a tab still open and nobody waits → "close it, or say what the user must do" |
+| Stop | - | unread comments → block, so Claude answers; else, once per stop: a tab still open and nobody waits → "close it, or mark it as needing a human" |
 
 Reads: stdin, ~/opt/my-setup/state/chrome/ (chrome_kit). Writes: open.json, history/, sessions/<id>.json, hook-errors.log.
 Fails open: on its own error it logs to hook-errors.log and lets the call through (exit 0, no output).
-Tests only: $CHROME_HOOK_PREFIX (a fake MCP server's tool prefix), $CHROME_CLAIM_CMD, $CHROME_HOOK_DEBUG (keep stdin).
+Tests only: $CHROME_HOOK_PREFIX (a fake MCP server's tool prefix), $AGENT_CHROME_CMD, $CHROME_HOOK_DEBUG (keep stdin).
 """
 from __future__ import annotations  # "str | None" hints on Python 3.9
 
@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chrome_kit as kit  # noqa: E402  (next to this file)
 
 CHROME = os.environ.get('CHROME_HOOK_PREFIX', 'mcp__claude-in-chrome__')
-CLAIM = os.environ.get('CHROME_CLAIM_CMD', 'chrome-claim')
+CLAIM = os.environ.get('AGENT_CHROME_CMD', 'agent-chrome')
 D_DEVICE = kit.D_DEVICE  # deviceId -> (profile name, projects allowed or None): chrome_kit
 DEFAULT_PREFIX = '7ffa990a'  # Chrome's Default profile: the user's own, with their password vault. Never.
 RE_TAB = re.compile(r'tabId (\d+): "(?:[^"\\]|\\.)*" \("((?:[^"\\]|\\.)*)"\)')  # • tabId 249416209: "title" ("url")
@@ -81,11 +81,11 @@ def visible_launch(cmd: str) -> bool:
         if word.endswith('Contents/MacOS/Google Chrome') and not any(a.startswith('--headless') for a in args):
             return True  # the binary itself, not headless (--profile-directory or not)
     return False
-CLAIM_HELP = (f'  {CLAIM} --purpose "<why, in words the user understands>" --needs-human "<what the user must do in the tab>"\n'
-              f'  or, when nobody must act but a headless Chrome cannot do it (a logged-in profile: WhatsApp, LinkedIn…):\n'
-              f'  {CLAIM} --purpose "<why>" --visible-because "<why headless cannot do it>"\n'
-              'A Claude in Chrome tab is always visible to the user: if nobody needs to see it and no logged-in profile is '
-              'needed, use a headless Chrome from a script instead (skill chrome-headless).')
+CLAIM_HELP = (f'  {CLAIM} authorize-tab "<why, in words the human understands>" --needs-human "<what the human must do in the tab>"\n'
+              f'  or, when no human must act but a headless Chrome cannot do it (a logged-in profile: WhatsApp, LinkedIn…):\n'
+              f'  {CLAIM} authorize-tab "<why>" --visible-because "<why headless cannot do it>"\n'
+              'A Claude in Chrome tab is always visible to the human: if no human needs to see it and no logged-in profile is '
+              'needed, use a headless Chrome from a script instead (skill chrome).')
 
 
 def out(d: dict):
@@ -130,7 +130,7 @@ def take_comments(sid: str, d_open: dict) -> str:
     # Worded as the user's own message: on 2026-11-01 haiku ignored "a hook note" as not part of the request
     return ("Message from the user, typed in the comment box on the Chrome tab this session opened (the agents' "
             'on-page note; only the user can type there). Treat it like a chat message from them:\n' + '\n'.join(l_txt) +
-            f'\nAnswer it on the tab with {CLAIM} --message "<your answer>", and here.')
+            f'\nAnswer it on the tab with {CLAIM} reply-to-human "<your answer>", and here.')
 
 
 def main():
@@ -146,9 +146,9 @@ def main():
         if visible_launch(str(d_inp.get('command', ''))):
             deny('Refused by the Chrome hook: a Chrome window started from the shell appears in front of the user and no '
                  'agent tool can see or close it (CLAUDE.md "Chrome profiles"). Use a headless Chrome from a script '
-                 '(skill chrome-headless; ~/opt/my-setup/chrome/launch_headless.py), or, to show the user a page, Claude in '
+                 '(skill chrome; ~/opt/my-setup/chrome/launch_headless.py), or, to show the human a page, Claude in '
                  'Chrome in the right profile; if that profile is not connected, open its window in the background with '
-                 f'`{CLAIM} window` (the one sanctioned way: no focus, only when the profile has no window).')
+                 f'`{CLAIM} open-profile-window` (the one sanctioned way: no focus, only when the profile has no window).')
         return
     if not sid:
         return
@@ -203,13 +203,13 @@ def main():
         if opens and not d_sess.get('purpose'):
             deny('Chrome hook: before this session opens a page, say why, in one Bash call:\n' + CLAIM_HELP + '\nThen retry.')
         if new_tab and not (d_sess.get('needs_human') or d_sess.get('visible_because')):
-            deny('Chrome hook: this tab will be visible to the user, so say what they must do in it or why headless cannot '
+            deny('Chrome hook: this tab will be visible to the human, so say what they must do in it or why headless cannot '
                  'do it:\n' + CLAIM_HELP + '\nThen retry.')
         if name == 'tabs_create_mcp' and mine:
             l_t = [f'tab {t} ({(e.get("url") or "")[:60]})' for t, e in mine.items()]
             deny(f'Chrome hook: this session already has {", ".join(l_t)} open: one tab per session. Reuse it (navigate '
                  'with its tabId), or close it first with tabs_close_mcp. If it no longer exists, call tabs_context_mcp '
-                 'once (that corrects the record) and retry.')
+                 f'once (that corrects the record) and retry. What your project has open: {CLAIM} status --mine.')
         say([])
         return
 
@@ -249,7 +249,7 @@ def main():
         if l_new:
             kit.correct(ctx)  # a new tab: also drop what a browser restart left in open.json
         say([(f'Chrome kit: tab {", ".join(map(str, l_new))} recorded for this session (purpose: {d_sess.get("purpose")!r}). '
-              f'Close it with tabs_close_mcp when done; if the user must act in it: {CLAIM} --needs-human "<what>".')
+              f'Close it with tabs_close_mcp when done; if a human must act in it: {CLAIM} mark-as-needing-human "<what>".')
              if l_new else ''])
         return
 
@@ -260,8 +260,8 @@ def main():
             l_t = [f'{t} ({(e.get("url") or "")[:60]})' for t, e in mine.items()]
             out({'decision': 'block', 'reason':
                  f'Chrome kit: this session still has tab(s) {", ".join(l_t)} open. Close them with tabs_close_mcp and check '
-                 f'with tabs_context_mcp, or, if the user must act in one, run {CLAIM} --needs-human "<what>" and name the '
-                 'tab in your answer.'})
+                 f'with tabs_context_mcp, or, if a human must act in one, run {CLAIM} mark-as-needing-human "<what>" and '
+                 'name the tab in your answer.'})
 
 
 if __name__ == '__main__':

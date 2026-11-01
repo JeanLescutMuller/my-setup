@@ -8,7 +8,7 @@ Reads $CHROME_STATE (chrome_kit): open.json (what is open now), history/YYYY-MM.
 their replies), comments.jsonl (the user's comments). Writes one line to comments.jsonl per comment typed in the
 side panel: ts, dt, session_id, tab_id, url, text (hook.py gives it to the session). Writes windows/<profile>.json
 while the extension runs: ts, dt, pid, profile, windows (ids), projects ({project: its agent window}); removed when
-the extension goes (chrome-claim window reads it: does this profile have a window?).
+the extension goes (agent-chrome open-profile-window reads it: does this profile have a window?).
 Sends the extension {"notes": {tab_id: entry + "thread"}} at start and after every change of those files: only
 Claude in Chrome tabs (device_id set) opened since the user's Chrome started (Chrome reuses tab ids after a restart).
 Python 3.9 (macOS /usr/bin/python3), standard library only.

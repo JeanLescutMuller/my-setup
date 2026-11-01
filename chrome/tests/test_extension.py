@@ -4,7 +4,7 @@ against a temporary $CHROME_STATE, in a Chrome for Testing with a throwaway prof
 
 Usage: <python with playwright 1.55> tests/test_extension.py <Chrome for Testing binary> <scratch dir> [<screenshots dir>]
   e.g. npx @puppeteer/browsers install chrome@stable --path <scratch>   # gets a Chrome for Testing
-Reads: chrome/extension/, chrome/native_host.py, chrome/chrome_kit.py, chrome/chrome_claim.py.
+Reads: chrome/extension/, chrome/native_host.py, chrome/chrome_kit.py, chrome/agent_chrome.py.
 Writes: in <scratch dir>: state/ (the temporary record), profile/ (throwaway, with NativeMessagingHosts/), host.sh;
 screenshots in <screenshots dir> (default <scratch dir>). Prints PASS/FAIL per check; terminates its Chrome.
 """
@@ -78,7 +78,7 @@ class Pages(http.server.BaseHTTPRequestHandler):
 
 
 def claim(*args, sid=SID):
-    r = subprocess.run(['/usr/bin/python3', '-I', str(KIT / 'chrome_claim.py'), *args], cwd=PROJ, capture_output=True,
+    r = subprocess.run(['/usr/bin/python3', '-I', str(KIT / 'agent_chrome.py'), *args], cwd=PROJ, capture_output=True,
                        text=True, env={**os.environ, 'CLAUDE_CODE_SESSION_ID': sid})
     assert r.returncode == 0, r.stderr
 
@@ -128,7 +128,7 @@ def windows(ctx, ctl, base):
     active = lambda w: js(f'chrome.tabs.query({{windowId: {w}, active: true}}).then(l => l[0].id)')
     marker = lambda proj: f'chrome-extension://{EXT_ID}/window.html?project={proj}&profile=Claude+-+general'
 
-    # 7a. `chrome-claim window` opened A's window (its first tab: window.html?project=proj-a)
+    # 7a. `agent-chrome open-profile-window` opened A's window (its first tab: window.html?project=proj-a)
     w_a = js(f"chrome.windows.create({{focused: false, url: '{marker('proj-a')}'}}).then(w => w.id)")
     time.sleep(1.5)
     d_rep = kit.read_json(STATE / 'windows' / 'Claude - general.json')
@@ -230,14 +230,14 @@ def main():
             page.screenshot(path=str(SHOTS / 'ext_bar_before.png'))
             kit.record([{'event': 'open', 'tab_id': tid, 'url': f'{base}/apply', 'profile': 'Claude - LinkedIn',
                          'device_id': GEN}], {'session_id': SID, 'cwd': str(PROJ)})
-            claim('--purpose', 'Apply to job 4312 (Data Engineer, Zurich)', '--needs-human', 'solve the captcha')
+            claim('authorize-tab', 'Apply to job 4312 (Data Engineer, Zurich)', '--needs-human', 'solve the captcha')
             time.sleep(2)
             txt = bar_text(page)
             opened = kit.read_open()[str(tid)]['opened_ts']
             day = time.strftime('%d', time.localtime(opened))
             check('bar on top, red, badge "!"', bar_on_top(page) and badge(tid) == '!')
-            check('bar fields: opened (date + time), session UUID, project, purpose, YOUR TURN; no job',
-                  all(s in txt for s in ['opened', day, SID, 'job-applications', 'Apply to job 4312', 'YOUR TURN: solve the captcha'])
+            check('bar fields: opened (date + time), session UUID, project, purpose, NEEDS HUMAN; no job',
+                  all(s in txt for s in ['opened', day, SID, 'job-applications', 'Apply to job 4312', 'NEEDS HUMAN: solve the captcha'])
                   and 'job ' not in txt.replace('job-applications', '').replace('to job', ''), txt)
             covered = page.evaluate(MEASURE)
             check('nothing covered (page and its fixed header pushed down)', covered == [], covered)
@@ -259,7 +259,7 @@ def main():
             jpage.screenshot(path=str(SHOTS / 'ext_bar_job.png'))
             jpage.close()
 
-            # 3. comment round trip: typed in the side panel -> comments.jsonl; the agent's reply (chrome-claim --message)
+            # 3. comment round trip: typed in the side panel -> comments.jsonl; the agent's reply (agent-chrome reply-to-human)
             sp = ctx.new_page()
             sp.set_viewport_size({'width': 380, 'height': 640})
             sp.goto(f'chrome-extension://{EXT_ID}/sidepanel.html?tabId={tid}')
@@ -272,16 +272,16 @@ def main():
             check('comment -> comments.jsonl: ts, dt, session_id, tab_id, url, text',
                   list(last) == ['ts', 'dt', 'session_id', 'tab_id', 'url', 'text'] and last['session_id'] == SID
                   and last['tab_id'] == tid and last['url'] == f'{base}/apply' and last['text'] == 'Captcha solved, go on', last)
-            claim('done')
-            claim('--message', 'Thanks, I see it. Continuing the application.')
+            claim('mark-as-human-done')
+            claim('reply-to-human', 'Thanks, I see it. Continuing the application.')
             time.sleep(2)
             body = sp.inner_text('body')
             check('side panel thread: the comment, then the agent\'s reply', body.find('Captcha solved') < body.find('Continuing the application') and 'Captcha solved' in body, body[:120])
             sp.screenshot(path=str(SHOTS / 'ext_side_panel_thread.png'))
             sp.close()
             txt = bar_text(page)
-            check('bar after chrome-claim done + --message: no YOUR TURN, agent message shown, badge not "!"',
-                  'YOUR TURN' not in txt and 'agent: Thanks, I see it' in txt and badge(tid) != '!', txt)
+            check('bar after mark-as-human-done + reply-to-human: no NEEDS HUMAN, agent message shown, badge not "!"',
+                  'NEEDS HUMAN' not in txt and 'agent: Thanks, I see it' in txt and badge(tid) != '!', txt)
             page.screenshot(path=str(SHOTS / 'ext_bar_reply.png'))
 
             # 4. side panel: no click -> refused; a click on the bar's "details · reply" -> opened

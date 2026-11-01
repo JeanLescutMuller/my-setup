@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Read-only report of what agents left open in Chrome on this Mac (skill chrome-leftovers): Chrome processes,
+"""Read-only report of what agents left open in Chrome on this Mac (skill chrome): Chrome processes,
 open windows and tabs with the agent that opened each tab, when each profile's windows were opened, the shell
 commands that started Chrome, and the job logs' "chrome:" lines. Closes nothing.
 
 Reads: `ps`, Chrome through AppleScript (window and tab ids = the ids Claude in Chrome uses), Chrome's
 "Local State" and <profile>/Sessions/ file names, ~/.claude/projects/**/*.jsonl (Claude Code transcripts, the last
 --hours), ~/opt/job-runner/logs/*/*/*.log. Writes nothing.
-Run: python3 -I ~/.claude/skills/chrome-leftovers/scripts/leftovers.py [--hours 24]
+Run: python3 -I ~/.claude/skills/chrome/scripts/leftovers.py [--hours 24]
 """
 import argparse
 import glob

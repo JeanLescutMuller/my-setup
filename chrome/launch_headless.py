@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The Chrome kit's launcher: the one way for scripts and scheduled jobs to start a headless Chrome (skill
-chrome-headless). It records every tab like the hook does, and reuses what the previous run left open.
+chrome). It records every tab like the hook does, and reuses what the previous run left open.
 
 - Reuse: a Chrome already running on the same data folder (its DevToolsActivePort answers) is attached, not started
   again; its tab recorded open for the same job (else the same project) is reused, not opened again.
@@ -93,7 +93,7 @@ def start(data_dir: Path, flags=()) -> int:
 
 
 def stop(data_dir: Path, port: int | None):
-    """Quit Chrome on this data folder and check no process is left (skill chrome-headless)."""
+    """Quit Chrome on this data folder and check no process is left (skill chrome)."""
     with contextlib.suppress(OSError):
         if port:
             for t in cdp(port, '/json/list'):

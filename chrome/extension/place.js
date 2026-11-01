@@ -1,5 +1,5 @@
 // Agent tab notes: one agent window per project (the Chrome kit's question 4c), per profile.
-// The first window that holds a tab of project P (or the window `chrome-claim window` opened for P: its first tab is
+// The first window that holds a tab of project P (or the window `agent-chrome open-profile-window` opened for P: its first tab is
 // window.html?project=P) becomes P's window; a later session's tab group of P that Claude in Chrome put in another
 // window (it uses the profile's last-focused window) is moved there with chrome.tabGroups.move, in the background.
 // Only agent tabs (in the kit's open.json, sent by the native host as notes) are ever moved, never the user's; a
@@ -92,7 +92,7 @@ if (typeof chrome !== "undefined" && chrome.windows) {
       setReport(fn) { report = fn; },
       local, normalIds,
       place: notes => run(async () => { for (const id of Object.keys(notes)) await placeOne(id, notes); await report(); }),
-      // window.html, the first tab of a window `chrome-claim window` (or decide's new_window) opened for a project
+      // window.html, the first tab of a window `agent-chrome open-profile-window` (or decide's new_window) opened for a project
       marker: (project, profile, tab) => run(async () => {
         let { map } = await local();
         if (profile) await chrome.storage.local.set({ profile });

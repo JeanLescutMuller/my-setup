@@ -75,11 +75,12 @@ with open(path + '.tmp', 'w') as f:
     f.write('\n')
 os.replace(path + '.tmp', path)
 PYEOF
+    _remove_link "$HOME/.local/bin/agent-chrome" "$OPT_DIR/chrome/agent_chrome.py"
     _remove_link "$HOME/.local/bin/chrome-claim" "$OPT_DIR/chrome/chrome_claim.py"
     _remove_link "$HOME/.local/bin/chrome-who" "$OPT_DIR/chrome/chrome_who.py"
     _nmh="$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.jeanlescut.agent_tab_notes.json"
     grep -q "$OPT_DIR/chrome/native_host.py" "$_nmh" 2>/dev/null && rm "$_nmh" && installed "removed $_nmh"
-    for f in hook.py chrome_kit.py chrome_claim.py chrome_who.py launch_headless.py native_host.py; do
+    for f in hook.py chrome_kit.py agent_chrome.py chrome_claim.py chrome_who.py launch_headless.py native_host.py; do
         [ -f "$OPT_DIR/chrome/$f" ] && rm "$OPT_DIR/chrome/$f" && installed "removed $OPT_DIR/chrome/$f"
     done
     for f in manifest.json background.js push.js note.js sidepanel.html sidepanel.js; do

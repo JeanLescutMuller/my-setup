@@ -1,4 +1,4 @@
-// window.html: the first tab (pinned) of a project's agent window, opened by `chrome-claim window` or by place.js.
+// window.html: the first tab (pinned) of a project's agent window, opened by `agent-chrome open-profile-window` or by place.js.
 // Tells the background which project this window is for; its title names the project in Mission Control.
 const q = new URLSearchParams(location.search);
 const project = q.get("project") || "", profile = q.get("profile") || "";

@@ -74,6 +74,14 @@ check('Facebook profile refused outside marketplace-seller', decision(hook('PreT
 check('Facebook profile allowed in marketplace-seller', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'db5922d3-1713-4df0-a025-1ac608fac5f1'}, cwd='/Users/jeanlescut/dev/marketplace-seller')) is None)
 check('general profile allowed', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': GEN})) is None)
 hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'Selected browser "Browser 1".'}])
+# One profile per session: the first selection fixes it
+d = hook('PreToolUse', C + 'select_browser', {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, cwd='/Users/jeanlescut/dev/job-applications')
+check('one profile per session: a 2nd profile refused, naming both', decision(d) == 'deny' and 'Claude - general' in reason(d) and 'Claude - LinkedIn' in reason(d))
+check('one profile per session: switch_browser refused once a profile is fixed', decision(hook('PreToolUse', C + 'switch_browser')) == 'deny')
+check('one profile per session: the same profile again allowed', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': GEN})) is None)
+hook('PostToolUse', C + 'switch_browser', {}, [{'type': 'text', 'text': 'Connected to ' + 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}], session_id='sess-S')
+d = hook('PreToolUse', C + 'select_browser', {'deviceId': GEN}, session_id='sess-S')
+check('switch_browser fixes the profile when its answer names it', decision(d) == 'deny' and 'Claude - LinkedIn' in reason(d))
 # A reason before anything opens; a visible reason before a new tab
 d = hook('PreToolUse', C + 'tabs_create_mcp')
 check('tabs_create refused before a claim, explaining both options', decision(d) == 'deny' and '--needs-human' in reason(d) and '--visible-because' in reason(d))
@@ -145,6 +153,11 @@ check('chrome-who: drops a tab older than the browser\'s start and a headless ta
 check('chrome-who lists processes', "user's Chrome" in r.stdout)
 ps.write_text(ps.read_text() + '  777 00:10 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome --user-data-dir=/tmp/x\n')
 check('chrome-who says BLIND with two visible Chromes', 'BLIND' in cli('chrome_who.py').stdout)
+check('chrome-who: a visible Chrome nobody recorded is "NO: not started by the launcher"', 'NO: not started' in cli('chrome_who.py').stdout)
+subprocess.run([sys.executable, '-IB', '-c', f'import sys; sys.path.insert(0, {str(KIT)!r}); import chrome_kit as k; '
+                'k.record([{"event": "open", "tab_id": "chrome:/tmp/x", "profile": "visible:/tmp/x", "url": "about:blank"}], {"session_id": "sess-pw", "cwd": "/tmp"})'], env=ENV)
+r = cli('chrome_who.py')
+check('chrome-who: the password layer\'s visible:<dir> Chrome counts as in the kit', 'NO: not started' not in r.stdout and 'chrome:/tmp/x' in opened())
 check('chrome-who --since 1d: the history', 'navigate' in cli('chrome_who.py', '--since', '1d').stdout)
 # A job without Bash says why in its environment; a new tab still needs a visible reason
 ENV['CHROME_PURPOSE'] = 'auto-job-apply: apply to 3 jobs'
@@ -154,6 +167,14 @@ ENV['CHROME_VISIBLE_BECAUSE'] = 'the job applies through the logged-in LinkedIn 
 check('$CHROME_PURPOSE + $CHROME_VISIBLE_BECAUSE: allowed', decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-K')) is None)
 # Shell launches of a visible Chrome
 for cmd, want in [('open -na "Google Chrome" --args --profile-directory="Profile 3"', 'deny'),
+                  ('open -a "Google Chrome"', 'deny'), ('cd x && open -na "Google Chrome" --args --new-window', 'deny'),
+                  ('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --profile-directory="Profile 3"', 'deny'),
+                  ('X=1 open -a "Google Chrome" https://x.ch', 'deny'), ('ls\nopen -a "Google Chrome"', 'deny'),
+                  ('open "/Applications/Google Chrome.app"', 'deny'),
+                  ('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \\\n  --headless --user-data-dir=/tmp/p', None),
+                  ("cat > /tmp/p.html <<'EOF'\n<p>run: open -a \"Google Chrome\" page.html</p>\nEOF\nls /tmp", None),
+                  ("python3 - <<'PY'\nimport os; os.system('open -a \"Google Chrome\"')\nPY", None),
+                  ('echo "then open -a Google Chrome yourself"', None), ('git commit -m "no more open -a Google Chrome"', None),
                   ('open -a Google\\ Chrome https://x.ch', 'deny'), ('open -b com.google.Chrome', 'deny'),
                   ('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --user-data-dir=/tmp/p about:blank', 'deny'),
                   ('"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --user-data-dir=/tmp/p', None),

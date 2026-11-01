@@ -77,7 +77,8 @@ def main():
           [[hm(e.get('opened_ts')), (e.get('session_id') or '')[:8], e.get('project'), e.get('job'), e.get('profile'),
             str(e.get('tab_id'))[:12], (e.get('url') or '')[:50], (e.get('purpose') or '')[:50], e.get('needs_human') or '',
             e.get('reply_to') or ''] for e in l_e])
-    s_kit = {(e.get('profile') or '')[9:] for e in l_e if (e.get('profile') or '').startswith('headless:')}
+    # a Chrome the kit knows: the launcher's (headless:<dir>) or the password layer's visible one (visible:<dir>)
+    s_kit = {(e.get('profile') or '').split(':', 1)[1] for e in l_e if (e.get('profile') or '').startswith(('headless:', 'visible:'))}
     print(f'\nChrome processes ({len(l_p)})')
     table(['pid', 'running since', 'kind', 'data folder', 'in the kit'],
           [[p['pid'], hm(p['start_ts']), p['kind'], p['data_dir'] or '', 'yes' if p['data_dir'] in s_kit else

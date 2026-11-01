@@ -41,10 +41,51 @@ D_DEVICE = {
 }
 DEFAULT_PREFIX = '7ffa990a'  # Chrome's Default profile: the user's own, with their password vault. Never.
 RE_TAB = re.compile(r'tabId (\d+): "(?:[^"\\]|\\.)*" \("((?:[^"\\]|\\.)*)"\)')  # • tabId 249416209: "title" ("url")
-_BIN = r'/Applications/Google(?:\\ | )Chrome\.app/Contents/MacOS/Google(?:\\ | )Chrome'
-RE_VISIBLE = re.compile(r'\bopen\s+(?:-\w+\s+)*-\w*a\w*\s+(?:-\w+\s+)*["\']?Google(?:\\ | )Chrome'  # open -a / -na "Google Chrome"
-                        r'|\bopen\s+(?:-\w+\s+)*-b\s+com\.google\.Chrome\b'                     # open -b com.google.Chrome
-                        r'|(?:^|[;&|(]\s*|\bexec\s+)["\']?' + _BIN + r'["\']?\s(?!.*--headless)', re.M)  # the binary, not headless
+RE_HEREDOC = re.compile(r"<<(-?)\s*(['\"]?)(\w+)\2")
+SKIP = {'exec', 'nohup', 'command', 'env', 'then', 'do', 'else', 'time', '!', '{', 'caffeinate'}
+
+
+def visible_launch(cmd: str) -> bool:
+    """Would the shell run a visible Chrome? Only what it would run counts (1 Nov 2026: a heredoc writing HTML that
+    mentions `open -a "Google Chrome"` was refused): heredoc bodies are dropped, a quoted string stays one word, and
+    `open` / the Chrome binary count only as the command word (start, or after ; && || | ( or a newline)."""
+    import shlex
+    l_keep, end = [], None
+    for line in cmd.replace('\\\n', ' ').split('\n'):  # (a `\` line continuation joins); drop heredoc bodies: from the line after `<<X` up to the line `X`
+        if end is not None:
+            if (line.lstrip('\t') if end[1] else line).strip() == end[0]:
+                end = None
+            continue
+        l_keep.append(line)
+        m = RE_HEREDOC.search(line)
+        end = (m.group(3), bool(m.group(1))) if m else None
+    try:
+        lex = shlex.shlex(' ; '.join(l_keep), posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        l_tok = list(lex)
+    except ValueError:  # unbalanced quotes: not a command we can read; never block on a guess
+        return False
+    l_cmd, cur = [], []
+    for t in l_tok + [';']:  # cut into simple commands at ; & | ( ) < > and their pairs
+        if t and set(t) <= set('();<>|&'):
+            l_cmd.append(cur)
+            cur = []
+        else:
+            cur.append(t)
+    for c in l_cmd:
+        while c and (c[0] in SKIP or re.fullmatch(r'\w+=.*', c[0])):  # X=1 open …, exec …, then …
+            c = c[1:]
+        if not c:
+            continue
+        word, args = c[0], c[1:]
+        if word == 'open' and any(re.fullmatch(r'-\w*[ab]\w*', a) for a in args) and any(
+                'google chrome' in a.lower() or a == 'com.google.Chrome' for a in args):
+            return True  # open -a "Google Chrome", open -na …, open -b com.google.Chrome
+        if word == 'open' and any(a.rstrip('/').endswith('Google Chrome.app') for a in args):
+            return True  # open "/Applications/Google Chrome.app"
+        if word.endswith('Contents/MacOS/Google Chrome') and not any(a.startswith('--headless') for a in args):
+            return True  # the binary itself, not headless (--profile-directory or not)
+    return False
 CLAIM_HELP = (f'  {CLAIM} --purpose "<why, in words the user understands>" --needs-human "<what the user must do in the tab>"\n'
               f'  or, when nobody must act but a headless Chrome cannot do it (a logged-in profile: WhatsApp, LinkedIn…):\n'
               f'  {CLAIM} --purpose "<why>" --visible-because "<why headless cannot do it>"\n'
@@ -107,7 +148,7 @@ def main():
     d_inp, cwd = d_in.get('tool_input') or {}, d_in.get('cwd') or ''
 
     if event == 'PreToolUse' and tool == 'Bash':  # first: every Bash call pays this, so nothing is read
-        if RE_VISIBLE.search(str(d_inp.get('command', ''))):
+        if visible_launch(str(d_inp.get('command', ''))):
             deny('Refused by the Chrome hook: a Chrome window started from the shell appears in front of the user and no '
                  'agent tool can see or close it (CLAUDE.md "Chrome profiles"). Use a headless Chrome from a script '
                  '(skill chrome-headless; ~/opt/my-setup/chrome/launch_headless.py), or, to show the user a page, Claude in '
@@ -144,6 +185,13 @@ def main():
             if name == 'select_browser' and dev not in D_DEVICE:
                 deny(f'Refused by the Chrome hook: deviceId {dev[:8]}… is not one of the agent profiles in CLAUDE.md '
                      '"Chrome profiles". Ask the user; never pick another browser yourself.')
+            fixed = d_sess.get('device_id')
+            if fixed and (name == 'switch_browser' or dev != fixed):  # one profile per session (user, 1 Nov 2026)
+                have = D_DEVICE.get(fixed, (fixed[:8],))[0]
+                want = D_DEVICE.get(dev, ('another profile',))[0] if name == 'select_browser' else 'another profile'
+                deny(f'Refused by the Chrome hook: this session uses "{have}"; a session uses one Chrome profile for its '
+                     'whole life, so it never reaches two accounts (LinkedIn and a general site) at once. Keep working '
+                     f'in "{have}", or ask the user to start another Claude session for {want}.')
             if dev in D_DEVICE and D_DEVICE[dev][1] and not any(x in cwd for x in D_DEVICE[dev][1]):
                 deny(f'Refused by the Chrome hook: "{D_DEVICE[dev][0]}" is only for {" or ".join(D_DEVICE[dev][1])} '
                      '(CLAUDE.md "Chrome profiles"). Use "Claude - general".')
@@ -171,8 +219,13 @@ def main():
 
     if event == 'PostToolUse' and tool.startswith(CHROME):
         name = tool[len(CHROME):]
-        if name == 'select_browser' and str(d_inp.get('deviceId') or '') in D_DEVICE:
-            kit.update_session(sid, device_id=d_inp['deviceId'], profile=D_DEVICE[d_inp['deviceId']][0])
+        if name in ('select_browser', 'switch_browser'):  # the first one fixes the session's profile
+            dev = str(d_inp.get('deviceId') or '')
+            if name == 'switch_browser':  # the user picked it in Chrome: its id is in the answer, if anywhere
+                resp = json.dumps(d_in.get('tool_response'))
+                dev = next((d for d in D_DEVICE if d in resp), '')
+            if dev in D_DEVICE and not d_sess.get('device_id'):
+                kit.update_session(sid, device_id=dev, profile=D_DEVICE[dev][0])
             say([])
             return
         dev = d_sess.get('device_id')

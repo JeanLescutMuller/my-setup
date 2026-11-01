@@ -10,7 +10,8 @@ Kept in $CHROME_STATE (default ~/opt/my-setup/state/chrome/; tests set a scratch
                          selected, how far its comments were read. Internal to the kit.
 Fields, in this order: ts, dt, [opened_ts, opened_dt: open.json only], event (open|navigate|claim|needs_human|done|
 message|close), session_id, project, job, machine, cwd, profile, device_id, tab_id, url, purpose, needs_human,
-message, reply_to. Headless tabs: profile "headless:<data folder>", tab_id = the CDP target id, device_id null.
+message, reply_to. Headless tabs: profile "headless:<data folder>", tab_id = the CDP target id, device_id null; a
+visible Chrome a script records itself (secrets-and-account-migration's pwlayer): profile "visible:<data folder>".
 Python 3.9+ (macOS's /usr/bin/python3), standard library only.
 """
 from __future__ import annotations  # "str | None" hints on Python 3.9
@@ -185,7 +186,7 @@ def correct(d_ctx: dict | None = None) -> int:
     for e in read_open().values():
         prof = e.get('profile') or ''
         gone = (not l_main or e['opened_ts'] < min(l_main) - 5) if e.get('device_id') else \
-            prof.startswith('headless:') and prof[9:] not in s_dirs
+            prof.startswith(('headless:', 'visible:')) and prof.split(':', 1)[1] not in s_dirs
         if gone:
             l_close.append({k: e.get(k) for k in FIELDS if k not in ('ts', 'dt', 'reply_to')} | {'event': 'close', 'ts': None, 'reply_to': e.get('reply_to')})
     if l_close:

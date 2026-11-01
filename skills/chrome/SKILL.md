@@ -18,7 +18,7 @@ description: How an agent uses Chrome on this Mac - the 5 questions to answer fi
 
 ### 1. May I open a tab? (security)
 
-Only after `agent-chrome authorize-tab "<why>" --visibility invisible|unfocused|focused --visibility-reason "<why this level>"` (`--project P` too when your folder is not inside `~/dev/<repo>`). Until then the hook refuses to open a page. The authorization belongs to this session only (read from `$CLAUDE_CODE_SESSION_ID`, which Claude Code sets in every agent shell; the hook gets the same id), for its whole life. **Always name your project**: inside `~/dev/<repo>` it is that repo (another value is refused); anywhere else `--project` is required, and it decides which profiles you may use.
+Only after `agent-chrome authorize-tab "<why>" --visibility invisible|unfocused|focused --visibility-reason "<why this level>" --mode single|subagents` (`--project P` too when your folder is not inside `~/dev/<repo>`). Until then the hook refuses to open a page. The authorization belongs to this session only (read from `$CLAUDE_CODE_SESSION_ID`, which Claude Code sets in every agent shell; the hook gets the same id), for its whole life. **Always name your project**: inside `~/dev/<repo>` it is that repo (another value is refused); anywhere else `--project` is required, and it decides which profiles you may use.
 
 | `--visibility` | Means | The kit enforces |
 |---|---|---|
@@ -81,6 +81,15 @@ Inside a Claude session, `headless()` first requires `agent-chrome authorize-tab
 
 Never in front of the user. Claude in Chrome actions (create a tab, navigate, click, screenshot) never bring Chrome forward (tested 2026-11-01). Opening a window always takes the focus for a moment, so only `open-profile-window` does it, and it gives the focus back at once. Never use side-panel or notification actions.
 
+## Two modes: where the human answers
+
+| `--mode` | Who has the tab | Where the human answers | How the agent hears it |
+|---|---|---|---|
+| `single` | the main agent | **in the session's terminal**; the side panel says "Answer in the terminal: session <id> (tmux …)", no comment box | the human's next prompt |
+| `subagents` | each subagent authorizes for itself and owns **one** tab (e.g. 10–20 subagents, one account each) | **in that tab's side panel**: the comment box talks to that tab's subagent | the subagent loops on `agent-chrome wait-for-human --timeout 60` (exit 0 = a comment, printed; 2 = none) and checks its page between calls |
+
+In subagents mode the tab, its needs-human, comments and expiry belong to (session, subagent id): the hook refuses another agent on a tab ("tab N belongs to subagent X") and adds `--agent-id <id>` to each `agent-chrome` command a subagent runs (its shell cannot see its id). The main agent may only close its subagents' tabs; to change what one does, it messages that subagent. Claude in Chrome itself is unreliable with subagents (the tab group is sometimes shared, a closed tab can make others unreachable): each subagent starts with `tabs_context_mcp createIfEmpty`, never closes its own tab, and the main agent closes them all at the end. The password layer (secrets-and-account-migration `pwl`) works the same way: each site belongs to the subagent that started it, others are refused.
+
 ## While working, and at the end
 
 | When | Do |
@@ -91,13 +100,14 @@ Never in front of the user. Claude in Chrome actions (create a tab, navigate, cl
 | the hook adds "Message from the user" | the user typed it in the tab's side panel: act on it as their request, answer with `agent-chrome reply-to-human "<text>"` (shown on the tab) |
 | end of the work (done, failed or nothing found) | `tabs_close_mcp` on every tab of your group; check with `tabs_context_mcp` (no `createIfEmpty`) that no group is left; say "tabs closed (checked)". The hook reminds you once at the end of a turn that leaves a tab open with no human needed |
 | keeping a tab | only while a human is needed in it (marked with `mark-as-needing-human`) |
-| a scheduled job without Bash | it sets `CHROME_PURPOSE`, `CHROME_VISIBILITY` (default `unfocused`) and `CHROME_VISIBILITY_REASON` in its environment instead of `authorize-tab`; `JR_JOB` names the job |
+| a scheduled job without Bash | it sets `CHROME_PURPOSE`, `CHROME_VISIBILITY` (default `unfocused`), `CHROME_VISIBILITY_REASON` and `CHROME_MODE` (default `single`) in its environment instead of `authorize-tab`; `JR_JOB` names the job |
 
 ## `agent-chrome`
 
 | Subcommand | Required | Optional | Does |
 |---|---|---|---|
-| `authorize-tab "<why>"` | `--visibility invisible\|unfocused\|focused`, `--visibility-reason "…"`; `--project P` outside a repo folder | `--project P` inside a repo (must match it) | the session's authorization; its reason shows on its tabs |
+| `authorize-tab "<why>"` | `--visibility invisible\|unfocused\|focused`, `--visibility-reason "…"`, `--mode single\|subagents`; `--project P` outside a repo folder | `--project P` inside a repo (must match it) | the session's authorization; its reason shows on its tabs |
+| `wait-for-human` | | `--timeout S` (default 30, max 300) | subagents mode: waits for the human's comment on this agent's tab; exit 0 = comment (printed), 2 = timeout |
 | `mark-as-needing-human "<what to do>"` | | | red "NEEDS HUMAN: …" bar, badge "!" |
 | `mark-as-human-done` | | | clears it: "✓ done, you may close" |
 | `reply-to-human "<text>"` | | | the agent's answer in the tab's thread |

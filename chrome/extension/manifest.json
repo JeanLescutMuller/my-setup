@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Agent tab notes",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Shows on each tab an agent opened: when, which Claude session and project, why, and what you must do now; a comment box to answer it. Keeps each project's agent tabs in that project's window.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvfZilmE7wf/mtK+mhZ1Tqw1fBEUX05duq/c2r8Bho8X7vampuH3G7TdUwLej4LnsOVKBGajS8PdN/XLT5P9iZv8MNAEIF6tL3vwTO+3E9IwDvsQDK/4d4EmuGRjM/FH00nFRbmcQsKcENVO2Au02KXZL1Neio4KmnZryE9XlV7baKOYa3zP9Qj2iU9pkFgsu1ZbVn9iH9QkD1tWZUI7zNrRTGAzVTN4xQRk2K2VYVZ40fZvEtkLl4PB/vo+FAfqtdaTTWJVHpw9di+Ht4921RgsQdhmpZNBb4Rru6tFchfe+gt92gAJetetD6rXlNECBf3er49dFX5vPxQZMv3ui+QIDAQAB",
   "permissions": [

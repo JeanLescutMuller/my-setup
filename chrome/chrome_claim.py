@@ -36,7 +36,7 @@ def main():
     elif a.purpose:  # the old visible reason becomes an unfocused authorization; a human's part, a mark after it
         if not (a.needs_human or a.visible_because):
             sys.exit('chrome-claim: refused: --purpose alone is not enough. Now:\n' + agent_chrome.AUTHORIZE_HELP)
-        l_run.append(['authorize-tab', a.purpose, '--visibility', 'unfocused', '--visibility-reason',
+        l_run.append(['authorize-tab', '--mode', 'single', a.purpose, '--visibility', 'unfocused', '--visibility-reason',
                       a.visible_because or f'a human must act in the tab: {a.needs_human}']
                      + (['--project', a.project] if a.project else []))
         if a.needs_human:

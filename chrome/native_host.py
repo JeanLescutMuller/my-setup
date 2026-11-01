@@ -6,7 +6,7 @@ stops it when the extension goes; the host manifest that allows it is written by
 Chrome's own NativeMessagingHosts/ folder (not a profile).
 Reads $CHROME_STATE (chrome_kit): open.json (what is open now), history/YYYY-MM.jsonl (the agents' "message" events:
 their replies), comments.jsonl (the user's comments). Writes one line to comments.jsonl per comment typed in the
-side panel: ts, dt, session_id, tab_id, url, text (hook.py gives it to the session). Writes windows/<profile>.json
+side panel: ts, dt, session_id, agent_id (the tab's owner), tab_id, url, text (hook.py gives it to the session). Writes windows/<profile>.json
 while the extension runs: ts, dt, pid, profile, windows (ids), projects ({project: its agent window}); removed when
 the extension goes (agent-chrome open-profile-window reads it: does this profile have a window?).
 Sends the extension {"notes": {tab_id: entry + "thread"}}, event "done" when the session's last need event since the
@@ -81,14 +81,14 @@ def notes() -> dict:
     since = min(l_main) - 5 if l_main else 0
     d_notes = {k: dict(e, thread=[]) for k, e in kit.read_open().items()
                if e.get('device_id') and (e.get('opened_ts') or 0) >= since}
-    by_sid = {}
+    by_key = {}   # (session, agent): a subagent's tab shows only its own messages and comments
     for e in d_notes.values():
-        by_sid.setdefault(e.get('session_id'), []).append(e)
+        by_key.setdefault(kit.owner(e), []).append(e)
     for f in history_files():
         for r in jsonl(f):
             ev = r.get('event')
             if ev in ('message', 'needs_human', 'done'):
-                for e in by_sid.get(r.get('session_id'), []):
+                for e in by_key.get(kit.owner(r), []):
                     if r.get('ts', 0) < e.get('opened_ts', 0):
                         continue
                     if ev == 'message' and r.get('message'):
@@ -97,7 +97,7 @@ def notes() -> dict:
                         e['human_done'] = ev == 'done'
     for c in jsonl(kit.COMMENTS):
         e = d_notes.get(str(c.get('tab_id')))
-        l_e = [e] if e else by_sid.get(c.get('session_id'), []) if c.get('session_id') else []
+        l_e = [e] if e else by_key.get(kit.owner(c), []) if c.get('session_id') else []
         for e in l_e:
             if c.get('ts', 0) >= e.get('opened_ts', 0):
                 e['thread'].append({'ts': c.get('ts'), 'from': 'you', 'text': c.get('text')})
@@ -111,7 +111,7 @@ def notes() -> dict:
 def add_comment(d: dict):
     entry = kit.read_open().get(str(d.get('tab_id')), {})
     ts = int(time.time())
-    row = {'ts': ts, 'dt': kit.utc(ts), 'session_id': entry.get('session_id'), 'tab_id': d.get('tab_id'),
+    row = {'ts': ts, 'dt': kit.utc(ts), 'session_id': entry.get('session_id'), 'agent_id': entry.get('agent_id'), 'tab_id': d.get('tab_id'),
            'url': d.get('url') or entry.get('url'), 'text': d.get('text')}
     with kit.locked(kit.COMMENTS):                    # one line per write: hook.py reads it by byte offset
         with open(kit.COMMENTS, 'a') as f:
@@ -123,15 +123,15 @@ def expired(d: dict):
     e = kit.read_open().get(str(d.get('tab_id')))
     if not e or not e.get('needs_human'):
         return                                        # closed or answered meanwhile: nothing expired
-    sid = e.get('session_id')
+    sid, aid = kit.owner(e)
     l_r = kit.record([{**{k: e.get(k) for k in kit.FIELDS if k not in ('ts', 'dt')}, 'event': 'expired', 'ts': None,
                        'url': d.get('url') or e.get('url')}])
     if not sid:
         return
-    f_sess = kit.SESSIONS / f'{sid}.json'
+    f_sess = kit.SESSIONS / f'{kit.key_name(sid, aid)}.json'
     if f_sess.exists():
-        kit.update_session(sid, needs_human=None)
-    f = kit.SESSIONS / f'{sid}.notices.jsonl'
+        kit.update_session(sid, aid, needs_human=None)
+    f = kit.SESSIONS / f'{kit.key_name(sid, aid)}.notices.jsonl'
     f.parent.mkdir(parents=True, exist_ok=True)
     n = {'ts': l_r[0]['ts'], 'dt': l_r[0]['dt'], 'event': 'expired', 'tab_id': e.get('tab_id'), 'url': l_r[0]['url'],
          'needs_human': e.get('needs_human'), 'expires_ts': e.get('expires_ts'),
@@ -146,7 +146,7 @@ def need_since(e: dict) -> int | None:
     ts = None
     for f in history_files():
         for r in jsonl(f):
-            if r.get('event') == 'needs_human' and r.get('session_id') == e.get('session_id') and r.get('needs_human') == e.get('needs_human'):
+            if r.get('event') == 'needs_human' and kit.owner(r) == kit.owner(e) and r.get('needs_human') == e.get('needs_human'):
                 ts = r.get('ts')
     return ts
 

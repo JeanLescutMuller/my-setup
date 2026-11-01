@@ -10,9 +10,11 @@
   .msg.you { background: var(--me); margin-left: auto; }
   .msg.agent { background: var(--agent); }
   .msg small { display: block; opacity: .65; font-size: 11px; }
+  [hidden] { display: none !important; }
   form { display: flex; gap: 6px; margin-top: 8px; }
   textarea { flex: 1; font: inherit; min-height: 44px; }
   button { font: inherit; }
+  .terminal { padding: 8px 10px; border-radius: 8px; background: var(--agent); color: var(--ink); margin-top: 8px; }
   #status { font-size: 12px; opacity: .7; min-height: 1em; }
   table { border-collapse: collapse; width: 100%; }
   td { border-top: 1px solid #8884; padding: 3px 6px; vertical-align: top; word-break: break-all; font-size: 12px; }
@@ -22,6 +24,7 @@
   <div id="action"></div>
   <h2>Messages with the agent</h2>
   <div id="thread"><small>No messages yet.</small></div>
+  <div id="terminal" class="terminal" hidden></div>
   <form id="send"><textarea id="text" placeholder="Message to the agent about this tab"></textarea><button>Send</button></form>
   <div id="status"></div>
   <h2>Who opened this tab</h2>

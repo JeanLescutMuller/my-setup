@@ -119,6 +119,7 @@ WANT = {  # event -> matchers
     'PostToolUse': ['mcp__claude-in-chrome__.*'],
     'UserPromptSubmit': [''],
     'Stop': [''],
+    'SubagentStop': [''],
 }
 path = os.environ['SETTINGS']
 with open(path) as f:
@@ -149,7 +150,7 @@ PYEOF
     case "$_ck_state" in
         ok) ok "hooks: Chrome kit groups" ;;
         skip) skip "hooks: Chrome kit groups" ;;
-        installed) installed "hooks: Chrome kit groups (PreToolUse x2, PostToolUse, UserPromptSubmit, Stop)" ;;
+        installed) installed "hooks: Chrome kit groups (PreToolUse x2, PostToolUse, UserPromptSubmit, Stop, SubagentStop)" ;;
         *) fail "hooks: Chrome kit groups ($_ck_state)" ;;
     esac
 elif [ "$(uname)" = Darwin ]; then

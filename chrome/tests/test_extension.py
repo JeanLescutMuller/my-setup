@@ -201,7 +201,7 @@ def expiry(ctx, ctl, base):
     tid = max(t['id'] for t in ctl.evaluate('chrome.tabs.query({})'))
     kit.record([{'event': 'open', 'tab_id': tid, 'url': f'{base}/login', 'profile': 'Claude - general', 'device_id': GEN}],
                {'session_id': sid, 'cwd': str(PROJ)})
-    r = subprocess.run(['/usr/bin/python3', '-I', str(KIT / 'agent_chrome.py'), 'authorize-tab', 'log in', '--visibility',
+    r = subprocess.run(['/usr/bin/python3', '-I', str(KIT / 'agent_chrome.py'), 'authorize-tab', '--mode', 'single', 'log in', '--visibility',
                         'unfocused', '--visibility-reason', 'a login', '--project', 'job-applications'], cwd=PROJ,
                        capture_output=True, text=True, env={**os.environ, 'CLAUDE_CODE_SESSION_ID': sid})
     r = subprocess.run(['/usr/bin/python3', '-I', str(KIT / 'agent_chrome.py'), 'mark-as-needing-human', 'log in'], cwd=PROJ,
@@ -260,7 +260,7 @@ def main():
             page.screenshot(path=str(SHOTS / 'ext_bar_before.png'))
             kit.record([{'event': 'open', 'tab_id': tid, 'url': f'{base}/apply', 'profile': 'Claude - LinkedIn',
                          'device_id': GEN}], {'session_id': SID, 'cwd': str(PROJ)})
-            claim('authorize-tab', 'Apply to job 4312 (Data Engineer, Zurich)', '--visibility', 'focused',
+            claim('authorize-tab', '--mode', 'single', 'Apply to job 4312 (Data Engineer, Zurich)', '--visibility', 'focused',
                   '--visibility-reason', 'the human solves a captcha', '--project', 'job-applications')
             active = lambda t: ctl.evaluate(f'chrome.tabs.get({t}).then(t => t.active)')
             other = ctx.new_page()            # the human is elsewhere: another tab in front
@@ -309,6 +309,15 @@ def main():
             sp.goto(f'chrome-extension://{EXT_ID}/sidepanel.html?tabId={tid}')
             time.sleep(1)
             body = sp.inner_text('body')
+            form_shown = lambda: sp.evaluate('!document.getElementById("send").hidden && getComputedStyle(document.getElementById("send")).display !== "none"')
+            check('side panel, mode single: "Answer in the terminal: session <id>", no comment box',
+                  f'Answer in the terminal: session {SID}' in body and not form_shown(), body[:200])
+            sp.screenshot(path=str(SHOTS / 'ext_side_panel_single.png'))
+            claim('authorize-tab', '--mode', 'subagents', 'Apply to job 4312 (Data Engineer, Zurich)', '--visibility', 'focused',
+                  '--visibility-reason', 'the human solves a captcha', '--project', 'job-applications')
+            time.sleep(2)
+            body = sp.inner_text('body')
+            check('side panel, mode subagents: the comment box, no terminal note', form_shown() and 'Answer in the terminal' not in body, body[:200])
             check('side panel details: visibility and why that visibility', 'why that visibility' in body and 'focused' in body
                   and 'the human solves a captcha' in body, body[:300])
             sp.fill('#text', 'Captcha solved, go on')
@@ -316,8 +325,8 @@ def main():
             time.sleep(1.5)
             rows = [json.loads(x) for x in kit.COMMENTS.read_text().splitlines()] if kit.COMMENTS.exists() else []
             last = rows[-1] if rows else {}
-            check('comment -> comments.jsonl: ts, dt, session_id, tab_id, url, text',
-                  list(last) == ['ts', 'dt', 'session_id', 'tab_id', 'url', 'text'] and last['session_id'] == SID
+            check('comment -> comments.jsonl: ts, dt, session_id, agent_id, tab_id, url, text',
+                  list(last) == ['ts', 'dt', 'session_id', 'agent_id', 'tab_id', 'url', 'text'] and last['session_id'] == SID
                   and last['tab_id'] == tid and last['url'] == f'{base}/apply' and last['text'] == 'Captcha solved, go on', last)
             claim('mark-as-human-done')
             claim('reply-to-human', 'Thanks, I see it. Continuing the application.')

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """agent-chrome: how an agent says why it uses Chrome and what a human must do, and how anyone asks what is open.
 
-  agent-chrome authorize-tab "<why>" --visibility invisible|unfocused|focused --visibility-reason "<why this level>" [--project P]
+  agent-chrome authorize-tab "<why>" --visibility invisible|unfocused|focused --visibility-reason "<why this level>"
+               --mode single|subagents [--project P]
   agent-chrome mark-as-needing-human "<what the human must do>"
   agent-chrome mark-as-human-done
   agent-chrome reply-to-human "<text>"
+  agent-chrome wait-for-human [--timeout SECONDS]
   agent-chrome status [--mine] [--since 7d] [--project P] [--json]
   agent-chrome open-profile-window [--project P]
 
@@ -12,8 +14,11 @@ The Chrome kit (my-setup chrome/, skill chrome). --visibility, enforced by the k
   invisible  only a headless Chrome from the launcher (launch_headless.py): every Claude in Chrome tab is refused;
   unfocused  Claude in Chrome tabs, in the background (never brought to the front);
   focused    the same, and when the session marks its tab as needing a human, the kit brings it to the front once.
-The first four subcommands act for the Claude session that runs them ($CLAUDE_CODE_SESSION_ID, set by Claude Code in
-every Bash call); status and open-profile-window work anywhere. The job is $JR_JOB. Reads and writes
+--mode: where the human answers. single: in the terminal (the tab's side panel says so, no comment box); subagents:
+in the tab's side panel, read by the agent that owns the tab (wait-for-human, or next to its tool calls).
+The first five subcommands act for the key that runs them: the Claude session ($CLAUDE_CODE_SESSION_ID, set by Claude
+Code in every Bash call) and, in a subagent, its agent id (--agent-id, which the kit's hook adds to every agent-chrome
+command a subagent runs; $CHROME_AGENT_ID too); status and open-profile-window work anywhere. The job is $JR_JOB. Reads and writes
 ~/opt/my-setup/state/chrome/ (chrome_kit: open.json, history/, sessions/, windows/) and reads `ps`.
 """
 from __future__ import annotations  # "str | None" hints on Python 3.9
@@ -75,8 +80,8 @@ def status(a, sid: str | None):
         if a.json:
             print(json.dumps(l_r, indent=1, ensure_ascii=False))
             return
-        table(['when', 'event', 'session', 'project', 'job', 'tab', 'url', 'purpose', 'visibility', 'needs human / message'],
-              [[hm(r['ts']), r['event'], (r.get('session_id') or '')[:8], r.get('project'), r.get('job'), r.get('tab_id'),
+        table(['when', 'event', 'session', 'agent', 'project', 'job', 'tab', 'url', 'purpose', 'visibility', 'needs human / message'],
+              [[hm(r['ts']), r['event'], (r.get('session_id') or '')[:8], r.get('agent_id') or '', r.get('project'), r.get('job'), r.get('tab_id'),
                 (r.get('url') or '')[:50], (r.get('purpose') or '')[:50], r.get('visibility') or '',
                 r.get('needs_human') or r.get('message') or '']
                for r in l_r])
@@ -93,10 +98,10 @@ def status(a, sid: str | None):
         print(f'{PROG} status: nothing open for project {project}')
     else:
         print(f'Agent tabs open now{" for project " + project if project else ""} ({len(l_e)})')
-        table(['opened', 'session', 'project', 'job', 'profile', 'tab', 'url', 'purpose', 'visibility', 'why that visibility',
-               'NEEDS HUMAN', 'reach it'],
+        table(['opened', 'session', 'agent', 'mode', 'project', 'job', 'profile', 'tab', 'url', 'purpose', 'visibility',
+               'why that visibility', 'NEEDS HUMAN', 'reach it'],
               [[hm(e.get('opened_ts')), 'this session' if sid and e.get('session_id') == sid else (e.get('session_id') or '')[:8],
-                e.get('project'), e.get('job'), e.get('profile'), str(e.get('tab_id'))[:12], (e.get('url') or '')[:50],
+                e.get('agent_id') or '', e.get('mode') or '', e.get('project'), e.get('job'), e.get('profile'), str(e.get('tab_id'))[:12], (e.get('url') or '')[:50],
                 (e.get('purpose') or '')[:50], e.get('visibility') or '', (e.get('visibility_reason') or '')[:40],
                 e.get('needs_human') or '', e.get('reply_to') or ''] for e in l_e])
     if a.mine:
@@ -104,6 +109,13 @@ def status(a, sid: str | None):
     # a Chrome the kit knows: the launcher's (headless:<dir>) or the password layer's visible one (visible:<dir>)
     s_kit = {(e.get('profile') or '').split(':', 1)[1] for e in d_open.values()
              if (e.get('profile') or '').startswith(('headless:', 'visible:'))}
+    for f in sorted(kit.HISTORY.glob('*.jsonl'))[-2:]:   # a visible Chrome a script recorded ("window": the password layer's)
+        for line in f.read_text().splitlines():
+            if '"window"' in line and '"visible:' in line:
+                try:
+                    s_kit.add(json.loads(line)['profile'].split(':', 1)[1])
+                except (ValueError, KeyError, AttributeError, IndexError):
+                    pass
     print(f'\nChrome processes ({len(l_p)})')
     table(['pid', 'running since', 'kind', 'data folder', 'in the kit'],
           [[p['pid'], hm(p['start_ts']), p['kind'], p['data_dir'] or '', 'yes' if p['data_dir'] in s_kit else
@@ -192,10 +204,35 @@ def open_profile_window(project: str, sid: str | None, cwd: str, ctx: dict):
           + (f'; focus given back to {before}' + (f' (window {win_before})' if before == 'Google Chrome' else '') if given_back else '') + '.')
 
 
+# ---------------------------------------------------------------- wait-for-human
+WAIT_MAX = 300
+
+
+def wait_for_human(a, sid: str, aid: str, me: str):
+    """Block until a comment for this key's tab arrives (exit 0, printed, marked delivered) or the timeout (exit 2)."""
+    t = a.timeout
+    if not 1 <= t <= WAIT_MAX:
+        sys.exit(f'{me}: --timeout takes 1 to {WAIT_MAX} seconds')
+    end = time.monotonic() + t
+    while True:
+        l_c = kit.take_comments(sid, aid)
+        if l_c:
+            for c in l_c:
+                print(f'{(c.get("dt") or "")[11:16]} UTC, tab {c.get("tab_id")} ({(c.get("url") or "")[:60]}): {c.get("text")}')
+            print(f'(from the user, typed in the side panel of your tab; answer on the tab with {PROG} reply-to-human "<text>")')
+            sys.exit(0)
+        if time.monotonic() >= end:
+            print(f'{me}: no comment in {t} s')
+            sys.exit(2)
+        time.sleep(1)
+
+
 # ---------------------------------------------------------------- the CLI
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog=PROG, description=__doc__.split('\n')[0],
                                  epilog='Skill chrome. Record: ~/opt/my-setup/state/chrome/.')
+    ap.add_argument('--agent-id', metavar='ID', help="a subagent's id: the kit's hook adds it to every agent-chrome command "
+                                                     'a subagent runs (never type it yourself); else $CHROME_AGENT_ID')
     sub = ap.add_subparsers(dest='cmd', metavar='<subcommand>')
     p = sub.add_parser('authorize-tab', help='say why this session uses Chrome, and how visible (before opening a tab)',
                        description='Say why this Claude session uses Chrome, for which project, and how visible it may be. '
@@ -205,6 +242,9 @@ def parser() -> argparse.ArgumentParser:
                    help='invisible: headless only (the launcher; Claude in Chrome refused); unfocused: Claude in Chrome '
                         'tabs in the background; focused: also brought to the front once, when marked as needing a human')
     p.add_argument('--visibility-reason', required=True, metavar='REASON', help='why this level, in free text')
+    p.add_argument('--mode', required=True, choices=kit.MODES,
+                   help='where the human answers: single = in the terminal (the side panel says so, no comment box); '
+                        'subagents = in the tab\'s side panel, read by the agent that owns the tab (wait-for-human)')
     p.add_argument('--project', metavar='P', help='the project the tab is for: required outside ~/dev/<repo> and '
                                                   '~/opt/<repo>; inside, <repo> (another value is refused)')
     p = sub.add_parser('mark-as-needing-human', help="a human must act in this session's tab now",
@@ -216,6 +256,11 @@ def parser() -> argparse.ArgumentParser:
     p = sub.add_parser('reply-to-human', help="answer the human's comment, shown on the tab",
                        description="Answer the human's comment (typed on the tab): shown on this session's tabs.")
     p.add_argument('text', metavar='TEXT', help='your answer')
+    p = sub.add_parser('wait-for-human', help="wait for the human's comment on your tab (mode subagents)",
+                       description="Block until the human writes in your tab's side panel (mode subagents): prints the "
+                                   'comment(s) and marks them delivered. Exit 0: a comment; 2: the timeout. Loop on it '
+                                   'while you check your page between calls.')
+    p.add_argument('--timeout', type=int, default=30, metavar='SECONDS', help=f'default 30, at most {WAIT_MAX}')
     p = sub.add_parser('status', help='what is open now (agent tabs, Chrome processes), or the history',
                        description='What agents have open now (tabs and Chrome processes), or the history with --since.')
     p.add_argument('--mine', action='store_true', help="only this session's authorized project, else the current folder's "
@@ -249,10 +294,16 @@ def main(argv: list | None = None):
         return
     me = f'{PROG} {a.cmd}'
     sid = os.environ.get('CLAUDE_CODE_SESSION_ID')
-    d_sess = kit.session(sid)
+    try:
+        aid = kit.agent_id(a.agent_id or os.environ.get('CHROME_AGENT_ID'))
+    except ValueError as e:
+        sys.exit(f'{me}: {e}')
+    d_sess = kit.session(sid, aid)
+    me_key = f'{(sid or "")[:8]}' + (f' (subagent {aid})' if aid else '')
     pwd = os.environ.get('PWD') or ''   # the folder as the shell names it (~/dev/my-context is a link), if it is this one
     cwd = pwd if pwd and Path(pwd).resolve() == Path(os.getcwd()).resolve() else os.getcwd()
-    ctx = dict(session_id=sid, cwd=os.getcwd(), job=os.environ.get('JR_JOB'), project=d_sess.get('project'))
+    ctx = dict(session_id=sid, agent_id=aid or None, cwd=os.getcwd(), job=os.environ.get('JR_JOB'), project=d_sess.get('project'),
+               mode=d_sess.get('mode'))
     if a.cmd == 'status':
         status(a, sid)
         return
@@ -263,40 +314,45 @@ def main(argv: list | None = None):
         sys.exit(f'{me}: {NO_SESSION}')
     if a.cmd == 'authorize-tab':
         project = authorized_project(a.project, cwd)
-        prof = d_sess.get('profile')   # a profile this session already fixed must be allowed for the project
+        prof = kit.session(sid).get('profile')   # a profile this session already fixed must be allowed for the project
         l_ok = next((l for n, l in kit.D_DEVICE.values() if n == prof), None)
         if l_ok and project not in kit.projects_of(l_ok):
             sys.exit(f'{me}: refused: this session uses "{prof}", which is only for '
                      f'{" or ".join(sorted(kit.projects_of(l_ok)))}; start another Claude session for project {project}')
-        kit.update_session(sid, purpose=a.why, project=project, visibility=a.visibility,
-                           visibility_reason=a.visibility_reason, visible_because=None)
-        ctx['project'] = project
-        d = dict(purpose=a.why, visibility=a.visibility, visibility_reason=a.visibility_reason)
+        kit.update_session(sid, aid, purpose=a.why, project=project, visibility=a.visibility,
+                           visibility_reason=a.visibility_reason, visible_because=None, mode=a.mode)
+        ctx.update(project=project, mode=a.mode)
+        d = dict(purpose=a.why, visibility=a.visibility, visibility_reason=a.visibility_reason, mode=a.mode)
         kit.record([{'event': 'claim', **d, 'needs_human': d_sess.get('needs_human')}], ctx, fanout=d)
-        print(f'{me}: recorded for {sid[:8]}, project {project}: {a.why!r}, visibility {a.visibility} '
-              f'({a.visibility_reason})' + (f'. A human must act in the tab: {PROG} mark-as-needing-human "<what>" '
+        print(f'{me}: recorded for {me_key}, project {project}: {a.why!r}, visibility {a.visibility} '
+              f'({a.visibility_reason}), mode {a.mode}' + (f'. A human must act in the tab: {PROG} mark-as-needing-human "<what>" '
                                             'after opening it' if a.visibility != 'invisible' else
-                                            '. Claude in Chrome tabs are refused; start the Chrome with the launcher'))
+                                            '. Claude in Chrome tabs are refused; start the Chrome with the launcher')
+              + (f'. The human answers in the tab\'s side panel: loop on {PROG} wait-for-human while you check the page'
+                 if a.mode == 'subagents' else '. The human answers in the terminal (the side panel says so)'))
     elif a.cmd == 'mark-as-needing-human':
         if not d_sess.get('purpose'):
             sys.exit(f'{me}: refused: this session has not said why it uses Chrome: {PROG} authorize-tab "<why>" '
                      '--visibility … --visibility-reason "…"')
-        kit.update_session(sid, needs_human=a.what)
+        kit.update_session(sid, aid, needs_human=a.what)
         kit.record([{'event': 'needs_human', 'purpose': d_sess['purpose'], 'visibility': d_sess.get('visibility'),
                      'visibility_reason': d_sess.get('visibility_reason'), 'needs_human': a.what}], ctx,
                    fanout={'purpose': d_sess['purpose'], 'needs_human': a.what})
-        print(f'{me}: recorded for {sid[:8]}: NEEDS HUMAN: {a.what}'
+        print(f'{me}: recorded for {me_key}: NEEDS HUMAN: {a.what}'
               + ('; its tab is brought to the front once (authorized focused)' if d_sess.get('visibility') == 'focused' else '')
               + f'. If nobody acts, the kit closes it at {hm(time.time() + kit.NEEDS_HUMAN_TTL)} '
-                f'({kit.ttl_text()}) and tells this session ("expired").')
+                f'({kit.ttl_text()}) and tells this session ("expired").'
+              + (f' The human may answer in the side panel: {PROG} wait-for-human' if d_sess.get('mode') == 'subagents' else ''))
     elif a.cmd == 'mark-as-human-done':
-        kit.update_session(sid, needs_human=None)
+        kit.update_session(sid, aid, needs_human=None)
         kit.record([{'event': 'done', 'purpose': d_sess.get('purpose'), 'needs_human': None}], ctx, fanout={'needs_human': None})
-        print(f'{me}: recorded for {sid[:8]}: nothing waits for a human any more')
+        print(f'{me}: recorded for {me_key}: nothing waits for a human any more')
     elif a.cmd == 'reply-to-human':
         kit.record([{'event': 'message', 'purpose': d_sess.get('purpose'), 'needs_human': d_sess.get('needs_human'),
                      'message': a.text}], ctx, fanout={'message': a.text})
-        print(f'{me}: recorded for {sid[:8]}: shown on its tab(s)')
+        print(f'{me}: recorded for {me_key}: shown on its tab(s)')
+    elif a.cmd == 'wait-for-human':
+        wait_for_human(a, sid, aid, me)
 
 
 if __name__ == '__main__':

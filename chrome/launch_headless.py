@@ -138,7 +138,7 @@ def headless(data_dir: Path, purpose: str, url: str = 'about:blank', keep: bool 
         raise PermissionError(
             f'launch_headless: this Claude session ({sid[:8]}) has not authorized an invisible Chrome'
             + (f' (it authorized {d_sess["visibility"]})' if d_sess.get('visibility') else '') + '. Run first: agent-chrome '
-            'authorize-tab "<why>" --visibility invisible --visibility-reason "<why headless is enough>" [--project P] '
+            'authorize-tab "<why>" --visibility invisible --visibility-reason "<why headless is enough>" --mode single [--project P] '
             '(skill chrome). Scheduled jobs and scripts run by hand (no $CLAUDE_CODE_SESSION_ID) need nothing.')
     data_dir = Path(data_dir).resolve()
     profile = f'headless:{data_dir}'

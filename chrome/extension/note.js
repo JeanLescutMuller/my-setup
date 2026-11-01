@@ -3,7 +3,7 @@
 // fixed or sticky headers) down by the bar's height, measured, since a narrow window wraps it onto two lines.
 // Drawn in a closed shadow root with a constructed stylesheet and no web_accessible_resources: the page's CSP and
 // CSS do not apply to it, and the page cannot probe for it by URL.
-// Fields, in the user's order: opened (date, time), session UUID, project, job (only when a job opened it),
+// Fields, in the user's order: opened (date, time), session UUID, subagent (if one opened it), project, job (only when a job opened it),
 // purpose, visibility, then NEEDS HUMAN (with the time the tab closes if nobody acts); then the agent's last message.
 (() => {
   let host = null, root = null, current = null, hidden = false, sizer = null;
@@ -43,6 +43,7 @@
     const parts = [
       `<span class="f"><span class="dim">opened</span> <b>${esc(opened(note.opened_ts))}</b></span>`,
       `<span class="f"><span class="dim">session</span> ${esc(note.session_id || "?")}</span>`,
+      note.agent_id ? `<span class="f"><span class="dim">subagent</span> ${esc(note.agent_id)}</span>` : "",
       `<span class="f"><span class="dim">project</span> <b>${esc(note.project || "?")}</b></span>`,
       note.job ? `<span class="f"><span class="dim">job</span> <b>${esc(note.job)}</b></span>` : "",
       `<span class="f">${esc(note.purpose || "(no purpose given)")}</span>`,

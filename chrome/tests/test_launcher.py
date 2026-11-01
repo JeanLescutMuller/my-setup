@@ -91,10 +91,10 @@ def in_session(*args):
 r = in_session(str(KIT / 'launch_headless.py'), '--data-dir', str(prof), '--purpose', 'in a session')
 check('inside a session with no authorization: refused, saying how, no Chrome started',
       r.returncode != 0 and 'has not authorized an invisible Chrome' in r.stderr and '--visibility invisible' in r.stderr and not alive())
-in_session(str(KIT / 'agent_chrome.py'), 'authorize-tab', 'read a page', '--visibility', 'unfocused', '--visibility-reason', 'x', '--project', 'p')
+in_session(str(KIT / 'agent_chrome.py'), 'authorize-tab', '--mode', 'single', 'read a page', '--visibility', 'unfocused', '--visibility-reason', 'x', '--project', 'p')
 r = in_session(str(KIT / 'launch_headless.py'), '--data-dir', str(prof), '--purpose', 'in a session')
 check('inside a session authorized unfocused: refused, naming it', r.returncode != 0 and 'it authorized unfocused' in r.stderr and not alive())
-in_session(str(KIT / 'agent_chrome.py'), 'authorize-tab', 'read a page', '--visibility', 'invisible', '--visibility-reason', 'a public page', '--project', 'p')
+in_session(str(KIT / 'agent_chrome.py'), 'authorize-tab', '--mode', 'single', 'read a page', '--visibility', 'invisible', '--visibility-reason', 'a public page', '--project', 'p')
 r = in_session(str(KIT / 'launch_headless.py'), '--data-dir', str(prof), '--purpose', 'in a session')
 hist = [json.loads(x) for f in (tmp / 'state/history').glob('*.jsonl') for x in f.read_text().splitlines()]
 check('inside a session authorized invisible: started and closed, recorded with its project and visibility',

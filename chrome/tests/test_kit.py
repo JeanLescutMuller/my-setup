@@ -88,28 +88,28 @@ d = hook('PreToolUse', C + 'tabs_create_mcp')
 check('tabs_create refused before an authorization, explaining it', decision(d) == 'deny' and 'authorize-tab' in reason(d) and '--visibility' in reason(d) and 'mark-as-needing-human' in reason(d))
 check('navigate refused before a claim too', decision(hook('PreToolUse', C + 'navigate', {'url': 'https://x.ch', 'tabId': 1})) == 'deny')
 check('reading tools never refused', decision(hook('PreToolUse', C + 'tabs_context_mcp')) is None)
-r = cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers', '--project', 'proj-x')
+r = cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'find Amazon RIVR engineers', '--project', 'proj-x')
 check('authorize-tab without --visibility and its reason refused, naming them', r.returncode != 0 and '--visibility' in r.stderr and '--visibility-reason' in r.stderr)
-r = cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers', '--visibility', 'unfocused', '--visibility-reason', 'r')
+r = cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'find Amazon RIVR engineers', '--visibility', 'unfocused', '--visibility-reason', 'r')
 check('authorize-tab outside ~/dev/<repo> without --project refused, saying it is required', r.returncode != 0 and '--project is required' in r.stderr)
-r = cli('agent_chrome.py', 'authorize-tab', 'x', '--visibility', 'unfocused', '--visibility-reason', 'r', '--project', 'other', cwd='/Users/jeanlescut/dev/my-setup')
+r = cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'x', '--visibility', 'unfocused', '--visibility-reason', 'r', '--project', 'other', cwd='/Users/jeanlescut/dev/my-setup')
 check('authorize-tab inside ~/dev/my-setup with --project other refused', r.returncode != 0 and 'project my-setup' in r.stderr)
-r = cli('agent_chrome.py', 'authorize-tab', 'x', '--visibility', 'unfocused', '--visibility-reason', 'r', cwd='/Users/jeanlescut/dev/my-setup/chrome', CLAUDE_CODE_SESSION_ID='sess-R')
+r = cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'x', '--visibility', 'unfocused', '--visibility-reason', 'r', cwd='/Users/jeanlescut/dev/my-setup/chrome', CLAUDE_CODE_SESSION_ID='sess-R')
 check('authorize-tab inside ~/dev/my-setup/chrome: project my-setup by default', r.returncode == 0 and json.loads((tmp / 'state/sessions/sess-R.json').read_text())['project'] == 'my-setup')
 r = cli('agent_chrome.py', 'mark-as-human-done', CLAUDE_CODE_SESSION_ID='')
 check('no $CLAUDE_CODE_SESSION_ID: the session subcommands refuse, saying so', r.returncode != 0 and 'run this inside a Claude Code session ($CLAUDE_CODE_SESSION_ID is not set)' in r.stderr)
 check('--session no longer exists', cli('agent_chrome.py', 'mark-as-human-done', '--session', 'x').returncode != 0)
 r = cli('chrome_claim.py', '--purpose', 'find Amazon RIVR engineers')
 check('old chrome-claim --purpose alone: still refused, explaining the new options', r.returncode != 0 and '--visibility' in r.stderr)
-check('authorize-tab --visibility unfocused accepted', cli('agent_chrome.py', 'authorize-tab', 'find Amazon RIVR engineers', '--visibility', 'unfocused',
+check('authorize-tab --visibility unfocused accepted', cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'find Amazon RIVR engineers', '--visibility', 'unfocused',
                                                            '--visibility-reason', 'LinkedIn needs the logged-in profile', '--project', 'proj-x').returncode == 0)
 check('tabs_create allowed after the claim', decision(hook('PreToolUse', C + 'tabs_create_mcp')) is None)
 d = hook('PostToolUse', C + 'tabs_create_mcp', {}, [{'type': 'text', 'text': f'Created new tab. Tab ID: {T}'}] + tabs((T, 'New tab', '')))
 e = opened().get(str(T), {})
-check('open.json entry: fields in order', list(e) == ['ts', 'dt', 'opened_ts', 'opened_dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'expires_ts', 'message', 'reply_to'])
+check('open.json entry: fields in order', list(e) == ['ts', 'dt', 'opened_ts', 'opened_dt', 'event', 'session_id', 'agent_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'mode', 'needs_human', 'expires_ts', 'message', 'reply_to'])
 check('open.json entry: session UUID, project = git toplevel, profile, purpose, no job', e.get('session_id') == 'sess-A' and e.get('project') == 'proj-x'
       and e.get('profile') == 'Claude - general' and e.get('purpose') == 'find Amazon RIVR engineers' and e.get('job') is None and e.get('reply_to', '').endswith('asm resume sess-A'))
-check('history line: fields in order, ts first', list(history()[-1]) == ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'expires_ts', 'message', 'reply_to'])
+check('history line: fields in order, ts first', list(history()[-1]) == ['ts', 'dt', 'event', 'session_id', 'agent_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'mode', 'needs_human', 'expires_ts', 'message', 'reply_to'])
 check('Claude is told the tab was recorded', 'recorded' in ctx(d))
 d = hook('PreToolUse', C + 'tabs_create_mcp')
 check('second tab refused: reuse tab N', decision(d) == 'deny' and f'tab {T}' in reason(d))
@@ -188,15 +188,15 @@ r = cli('agent_chrome.py', 'status')
 check('status: the password layer\'s visible:<dir> Chrome counts as in the kit', 'NO: not started' not in r.stdout and 'chrome:/tmp/x' in opened())
 check('status --since 1d: the history', 'navigate' in cli('agent_chrome.py', 'status', '--since', '1d').stdout)
 r = cli('agent_chrome.py', '--help')
-check('agent-chrome --help names the 6 subcommands', all(x in r.stdout for x in ['authorize-tab', 'mark-as-needing-human',
-      'mark-as-human-done', 'reply-to-human', 'status', 'open-profile-window']))
+check('agent-chrome --help names the 7 subcommands', all(x in r.stdout for x in ['authorize-tab', 'mark-as-needing-human',
+      'mark-as-human-done', 'reply-to-human', 'wait-for-human', 'status', 'open-profile-window']))
 # Visibility: invisible refuses every Claude in Chrome page; focused is recorded on the tab (the extension acts on it)
-cli('agent_chrome.py', 'authorize-tab', 'scrape the menu', '--visibility', 'invisible', '--visibility-reason', 'a public page', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-I')
+cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'scrape the menu', '--visibility', 'invisible', '--visibility-reason', 'a public page', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-I')
 for t, inp in [('tabs_create_mcp', {}), ('navigate', {'url': 'https://x.ch', 'tabId': 5}), ('tabs_context_mcp', {'createIfEmpty': True})]:
     d = hook('PreToolUse', C + t, inp, session_id='sess-I')
     check(f'invisible: {t} refused, pointing to the launcher and to --visibility unfocused', decision(d) == 'deny' and 'launcher' in reason(d) and '--visibility unfocused' in reason(d))
 check('invisible: reading tools still allowed', decision(hook('PreToolUse', C + 'tabs_context_mcp', session_id='sess-I')) is None)
-cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'focused', '--visibility-reason', 'the human uploads a file', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-F')
+cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'apply', '--visibility', 'focused', '--visibility-reason', 'the human uploads a file', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-F')
 hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'ok'}], session_id='sess-F')
 hook('PostToolUse', C + 'tabs_create_mcp', {}, tabs((555, 'New tab', '')), session_id='sess-F')
 r = cli('agent_chrome.py', 'mark-as-needing-human', 'upload CV.pdf', CLAUDE_CODE_SESSION_ID='sess-F')
@@ -206,7 +206,7 @@ check('focused: the tab entry carries visibility focused, its reason and the nee
 r = cli('agent_chrome.py', 'status')
 check('status shows visibility and its reason', 'visibility' in r.stdout and 'focused' in r.stdout and 'the human uploads a file' in r.stdout)
 # The authorized project: the profile check and status --mine use it
-cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'LinkedIn login', '--project', 'job-applications', CLAUDE_CODE_SESSION_ID='sess-P')
+cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'LinkedIn login', '--project', 'job-applications', CLAUDE_CODE_SESSION_ID='sess-P')
 check('profile check uses the authorized project: LinkedIn allowed for job-applications from another folder',
       decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, session_id='sess-P')) is None)
 check('profile check uses the authorized project: LinkedIn refused for proj-x even from ~/dev/job-applications',
@@ -300,7 +300,7 @@ ps.write_text(ps_saved)
 # and the session is told at its next hook call. The native host is run as Chrome would run it (stdin/stdout frames).
 import struct  # noqa: E402
 TE = 777
-cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'a login', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-E')
+cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'a login', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-E')
 hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'ok'}], session_id='sess-E')
 hook('PostToolUse', C + 'tabs_create_mcp', {}, tabs((TE, 'New tab', '')), session_id='sess-E')
 t0 = int(time.time())
@@ -363,7 +363,7 @@ def host_notes() -> dict:
     return m.get('notes', {})
 
 
-cli('agent_chrome.py', 'authorize-tab', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'a login', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-D')
+cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'a login', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID='sess-D')
 hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'ok'}], session_id='sess-D')
 hook('PostToolUse', C + 'tabs_create_mcp', {}, tabs((TD, 'New tab', '')), session_id='sess-D')
 cli('agent_chrome.py', 'mark-as-needing-human', 'log in', CLAUDE_CODE_SESSION_ID='sess-D')
@@ -395,6 +395,122 @@ def host_notes_as_chrome(**kw) -> dict:
 
 check('host started by Chrome: an inherited CHROME_STATE is ignored (the real record is read)', list(host_notes_as_chrome()) == ['4242'])
 check('host started by a test wrapper (CHROME_KIT_TEST=1): CHROME_STATE is used', '4242' not in host_notes_as_chrome(CHROME_KIT_TEST='1'))
+# Multiple-subagents mode (2 Nov 2026): the key is (session_id, agent_id); a subagent's hook input has agent_id
+SM, AA, AB = 'sess-M', 'aaaa1111aaaa1111a', 'bbbb2222bbbb2222b'
+TA, TB, TMAIN = 801, 802, 803
+r = cli('agent_chrome.py', 'authorize-tab', 'x', '--visibility', 'unfocused', '--visibility-reason', 'r', '--project', 'proj-x')
+check('authorize-tab without --mode refused, naming it', r.returncode != 0 and '--mode' in r.stderr, r.stderr[-200:])
+# the Bash rewrite: a subagent's agent-chrome and pwl get its id as an argument; quotes, heredocs, comments untouched
+l_rw = [('agent-chrome status --mine', f'agent-chrome --agent-id {AA} status --mine'),
+        ('cd x && agent-chrome mark-as-needing-human "log in; then agent-chrome x" && echo ok',
+         f'cd x && agent-chrome --agent-id {AA} mark-as-needing-human "log in; then agent-chrome x" && echo ok'),
+        ("echo 'agent-chrome status' | grep agent-chrome", None),
+        ('out=$(agent-chrome wait-for-human --timeout 60); echo "$out"', f'out=$(agent-chrome --agent-id {AA} wait-for-human --timeout 60); echo "$out"'),
+        ('echo "now: $(agent-chrome status)"', f'echo "now: $(agent-chrome --agent-id {AA} status)"'),
+        ('cat <<EOF > f\nagent-chrome status\nEOF\n~/.local/bin/agent-chrome reply-to-human \'it\'\\\'\'s done\' # agent-chrome',
+         f'cat <<EOF > f\nagent-chrome status\nEOF\n~/.local/bin/agent-chrome --agent-id {AA} reply-to-human \'it\'\\\'\'s done\' # agent-chrome'),
+        ('X=1 3_migration/subagents_tools/pwlayer/pwl start a.com | tail -1', f'X=1 3_migration/subagents_tools/pwlayer/pwl --agent {AA} start a.com | tail -1'),
+        (f'agent-chrome --agent-id {AA} status', None)]
+for c, want in l_rw:
+    d = hook('PreToolUse', 'Bash', {'command': c, 'description': 'd'}, session_id=SM, agent_id=AA)
+    got = d.get('hookSpecificOutput', {}).get('updatedInput', {})
+    check(f'Bash rewrite in a subagent: {c[:50]!r}', (got.get('command') == want and got.get('description') == 'd') if want else not got, got)
+check('Bash rewrite: never in the main agent', hook('PreToolUse', 'Bash', {'command': 'agent-chrome status'}, session_id=SM) == {})
+# authorization, one tab, ownership per key
+hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'ok'}], session_id=SM)
+check('a subagent not authorized yet: its tab refused, though the main agent selected the browser',
+      decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id=SM, agent_id=AA)) == 'deny')
+for a in (AA, AB):
+    r = cli('agent_chrome.py', '--agent-id', a, 'authorize-tab', f'log in to account {a[:4]}', '--visibility', 'unfocused',
+            '--visibility-reason', 'a login', '--mode', 'subagents', '--project', 'proj-x', CLAUDE_CODE_SESSION_ID=SM)
+check('authorize-tab --mode subagents for 2 subagents: one sessions file each', r.returncode == 0 and 'mode subagents' in r.stdout
+      and (tmp / f'state/sessions/{SM}.{AA}.json').exists() and json.loads((tmp / f'state/sessions/{SM}.{AB}.json').read_text())['mode'] == 'subagents', r.stdout + r.stderr)
+check('the main agent stays unauthorized', not json.loads((tmp / f'state/sessions/{SM}.json').read_text()).get('purpose'))
+check('subagent A may select the session\'s browser', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': GEN}, session_id=SM, agent_id=AA)) is None)
+check('subagent A may not select another profile (one per session)', decision(hook('PreToolUse', C + 'select_browser',
+      {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, session_id=SM, agent_id=AA, cwd='/Users/jeanlescut/dev/job-applications')) == 'deny')
+check('subagent A: its first tab allowed', decision(hook('PreToolUse', C + 'tabs_context_mcp', {'createIfEmpty': True}, session_id=SM, agent_id=AA)) is None)
+hook('PostToolUse', C + 'tabs_context_mcp', {'createIfEmpty': True}, tabs((TA, 'New tab', '')), session_id=SM, agent_id=AA)
+check('subagent B: its own first tab allowed although the group has A\'s', decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id=SM, agent_id=AB)) is None)
+hook('PostToolUse', C + 'tabs_create_mcp', {}, tabs((TA, 'New tab', ''), (TB, 'New tab', '')), session_id=SM, agent_id=AB)
+o = opened()
+check('open.json: A\'s tab is A\'s, B\'s is B\'s (B saw both in the shared group)', o[str(TA)]['agent_id'] == AA and o[str(TB)]['agent_id'] == AB
+      and o[str(TB)]['mode'] == 'subagents' and o[str(TA)]['purpose'].endswith('aaaa'), {k: o[k].get('agent_id') for k in (str(TA), str(TB))})
+check('history: agent_id right after session_id', list(history()[-1])[3:5] == ['session_id', 'agent_id'] and history()[-1]['agent_id'] == AB)
+check('one tab per subagent: A\'s second refused', decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id=SM, agent_id=AA)) == 'deny')
+d = hook('PreToolUse', C + 'navigate', {'tabId': TA, 'url': 'https://x.ch'}, session_id=SM, agent_id=AB)
+check('B on A\'s tab: refused, "tab N belongs to subagent A"', decision(d) == 'deny' and f'tab {TA} belongs to subagent {AA}' in reason(d), reason(d))
+d = hook('PreToolUse', C + 'browser_batch', {'actions': [{'name': 'computer', 'input': {'tabId': TA, 'action': 'screenshot'}}]}, session_id=SM, agent_id=AB)
+check('B on A\'s tab inside browser_batch: refused', decision(d) == 'deny')
+check('B on its own tab: allowed', decision(hook('PreToolUse', C + 'navigate', {'tabId': TB, 'url': 'https://b.ch'}, session_id=SM, agent_id=AB)) is None)
+d = hook('PreToolUse', C + 'javascript_tool', {'tabId': TA, 'text': '1'}, session_id=SM)
+check('the main agent driving A\'s tab: refused (it asks the subagent)', decision(d) == 'deny' and 'SendMessage' in reason(d), reason(d))
+check('the main agent closing A\'s tab: allowed (cleanup)', decision(hook('PreToolUse', C + 'tabs_close_mcp', {'tabId': TA}, session_id=SM)) is None)
+hook('PostToolUse', C + 'navigate', {'tabId': TA}, tabs((TA, 'x', 'https://a.ch/login'), (TB, 'New tab', '')), session_id=SM, agent_id=AA)
+hook('PostToolUse', C + 'tabs_context_mcp', {}, tabs((TA, 'x', 'https://a.ch/login'), (TB, 'y', 'https://b.ch/')), session_id=SM, agent_id=AB)
+o = opened()
+check('a navigation B sees on A\'s tab stays A\'s', o[str(TA)]['agent_id'] == AA and o[str(TB)]['url'] == 'https://b.ch/' and o[str(TB)]['agent_id'] == AB, o[str(TA)])
+hook('PostToolUse', C + 'tabs_context_mcp', {}, tabs((TA, 'x', 'https://a.ch/login')), session_id=SM, agent_id=AA)
+check('A\'s own group lists only its tab: B\'s tab is not taken for closed', str(TB) in opened() and str(TA) in opened())
+# needs human, comments, wait-for-human: per key
+cli('agent_chrome.py', '--agent-id', AA, 'mark-as-needing-human', 'log in to a.ch', CLAUDE_CODE_SESSION_ID=SM)
+o = opened()
+check('A marks needing human: only A\'s tab', o[str(TA)]['needs_human'] == 'log in to a.ch' and not o[str(TB)].get('needs_human'))
+check('CHROME_AGENT_ID works too', cli('agent_chrome.py', 'mark-as-human-done', CLAUDE_CODE_SESSION_ID=SM, CHROME_AGENT_ID=AB).returncode == 0
+      and opened()[str(TA)]['needs_human'] == 'log in to a.ch')
+hn = host_notes()
+check('host: A\'s note carries agent_id and mode', hn.get(str(TA), {}).get('agent_id') == AA and hn[str(TA)].get('mode') == 'subagents')
+hp = subprocess.Popen([sys.executable, '-IB', str(KIT / 'native_host.py')], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=ENV)
+hp.stdin.write(frame({'hello': 1}) + frame({'comment': {'tab_id': TA, 'url': 'https://a.ch/login', 'text': 'Logged in, go on'}}))
+hp.stdin.flush()
+time.sleep(1.5)
+hp.kill()
+c_last = json.loads(kit_comments.read_text().splitlines()[-1]) if (kit_comments := tmp / 'state/comments.jsonl').exists() else {}
+check('a comment on A\'s tab: comments.jsonl names session and agent A', c_last.get('session_id') == SM and c_last.get('agent_id') == AA
+      and list(c_last)[:5] == ['ts', 'dt', 'session_id', 'agent_id', 'tab_id'], c_last)
+check('B\'s tool call: the comment is not given to B', 'Logged in' not in ctx(hook('PostToolUse', C + 'navigate', {'tabId': TB}, [{'type': 'text', 'text': 'ok'}], session_id=SM, agent_id=AB)))
+check('the main agent\'s prompt: not given to it either', hook('UserPromptSubmit', session_id=SM) == {})
+r = cli('agent_chrome.py', '--agent-id', AB, 'wait-for-human', '--timeout', '2', CLAUDE_CODE_SESSION_ID=SM)
+check('wait-for-human for B: timeout, exit 2', r.returncode == 2, (r.returncode, r.stdout))
+r = cli('agent_chrome.py', '--agent-id', AA, 'wait-for-human', '--timeout', '5', CLAUDE_CODE_SESSION_ID=SM)
+check('wait-for-human for A: the comment, exit 0', r.returncode == 0 and 'Logged in, go on' in r.stdout, (r.returncode, r.stdout))
+check('delivered once: A\'s next tool call does not repeat it', 'Logged in' not in ctx(hook('PostToolUse', C + 'navigate', {'tabId': TA}, [{'type': 'text', 'text': 'ok'}], session_id=SM, agent_id=AA)))
+check('wait-for-human --timeout 301 refused', cli('agent_chrome.py', '--agent-id', AA, 'wait-for-human', '--timeout', '301', CLAUDE_CODE_SESSION_ID=SM).returncode not in (0, 2))
+t0 = time.time()
+hp = subprocess.Popen([sys.executable, '-IB', str(KIT / 'agent_chrome.py'), '--agent-id', AA, 'wait-for-human', '--timeout', '20'],
+                      stdout=subprocess.PIPE, text=True, env={**ENV, 'CLAUDE_CODE_SESSION_ID': SM}, cwd=CWD)
+time.sleep(1.5)
+with open(tmp / 'state/comments.jsonl', 'a') as f:
+    f.write(json.dumps({'ts': int(time.time()), 'dt': 'x', 'session_id': SM, 'agent_id': AA, 'tab_id': TA, 'url': 'u', 'text': 'second'}) + '\n')
+o_w = hp.communicate(timeout=25)[0]
+check('wait-for-human returns as soon as the comment arrives', hp.returncode == 0 and 'second' in o_w and time.time() - t0 < 6, (hp.returncode, o_w))
+hook('PostToolUse', C + 'navigate', {'tabId': TA}, [{'type': 'text', 'text': 'ok'}], session_id=SM, agent_id=AA)
+# end of turn: per key
+cli('agent_chrome.py', '--agent-id', AA, 'mark-as-human-done', CLAUDE_CODE_SESSION_ID=SM)
+d = hook('SubagentStop', session_id=SM, agent_id=AA, stop_hook_active=False)
+check('SubagentStop of A with its tab open: blocked, naming its tab only', d.get('decision') == 'block' and str(TA) in reason(d) and str(TB) not in reason(d), d)
+check('SubagentStop again (stop_hook_active): lets it stop', hook('SubagentStop', session_id=SM, agent_id=AA, stop_hook_active=True) == {})
+d = hook('Stop', session_id=SM, stop_hook_active=False)
+check('the main agent\'s Stop: told of its finished subagent A\'s tab, not of B (still running)', d.get('decision') == 'block'
+      and str(TA) in reason(d) and f'subagent {AA}' in reason(d) and str(TB) not in reason(d), d)
+hook('PostToolUse', C + 'tabs_close_mcp', {'tabId': TA}, [{'type': 'text', 'text': f'Closed tab {TA}.'}], session_id=SM)
+check('the main agent closed A\'s tab: recorded closed, as A\'s', str(TA) not in opened() and history()[-1]['event'] == 'close'
+      and history()[-1]['agent_id'] == AA, history()[-1])
+# expiry: the notice goes to the owning key
+(tmp / f'state/sessions/{SM}.{AB}.notices.jsonl').write_text(json.dumps({'tab_id': TB, 'url': 'u', 'needs_human': 'x', 'after_s': 7200, 'dt': '2026-11-01T10:00:00Z'}) + '\n')
+check('a notice for B: not given to A', 'expired' not in ctx(hook('PostToolUse', C + 'navigate', {'tabId': TA}, [{'type': 'text', 'text': 'ok'}], session_id=SM, agent_id=AA)))
+check('a notice for B: given to B', 'expired' in ctx(hook('PostToolUse', C + 'navigate', {'tabId': TB}, [{'type': 'text', 'text': 'ok'}], session_id=SM, agent_id=AB)))
+# a job: CHROME_MODE, default single
+ENV.update(CHROME_PURPOSE='job x', CHROME_VISIBILITY_REASON='a login')
+hook('PreToolUse', C + 'tabs_context_mcp', {'createIfEmpty': True}, session_id='sess-J1')
+ENV['CHROME_MODE'] = 'subagents'
+hook('PreToolUse', C + 'tabs_context_mcp', {'createIfEmpty': True}, session_id='sess-J2')
+ENV['CHROME_MODE'] = 'chat'
+d = hook('PreToolUse', C + 'tabs_context_mcp', {'createIfEmpty': True}, session_id='sess-J3')
+for k in ('CHROME_PURPOSE', 'CHROME_VISIBILITY_REASON', 'CHROME_MODE'):
+    ENV.pop(k)
+check('a job: CHROME_MODE, default single; a wrong value refused', json.loads((tmp / 'state/sessions/sess-J1.json').read_text())['mode'] == 'single'
+      and json.loads((tmp / 'state/sessions/sess-J2.json').read_text())['mode'] == 'subagents' and decision(d) == 'deny')
 check('hook never failed (no hook-errors.log)', not (tmp / 'state/hook-errors.log').exists())
 print(f'{n_pass} passed, {n_fail} failed; state: {tmp / "state"}')
 sys.exit(bool(n_fail))

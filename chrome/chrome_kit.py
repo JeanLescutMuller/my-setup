@@ -5,14 +5,20 @@ Kept in $CHROME_STATE (default ~/opt/my-setup/state/chrome/; tests set a scratch
                          every Claude in Chrome "Available tabs" answer (hook.py); entries older than the browser's
                          start, or headless ones whose Chrome is gone, are dropped (correct()).
   history/YYYY-MM.jsonl  every event, append only, one file per month (UTC).
-  comments.jsonl         the user's comments typed on a tab (written by the extension): ts, dt, session_id, tab_id, url, text.
-  sessions/<id>.json     per Claude session: its authorization (purpose, project, visibility, visibility_reason),
-                         needs_human, the browser it selected, how far its comments were read. Internal to the kit.
-  sessions/<id>.notices.jsonl  what the kit must tell the session at its next hook call (today: a tab of its that
+  comments.jsonl         the user's comments typed on a tab (written by the extension): ts, dt, session_id, agent_id,
+                         tab_id, url, text.
+  sessions/<key>.json    per key (below): its authorization (purpose, project, visibility, visibility_reason, mode),
+                         needs_human, how far its comments were read; the main key also holds the browser the session
+                         selected (one per session: its subagents share Claude in Chrome's connection). Internal to the kit.
+  sessions/<key>.notices.jsonl  what the kit must tell the key at its next hook call (today: a tab of its that
                          expired), written by native_host.py, read and removed by hook.py.
+The key (2 Nov 2026, "multiple-subagents mode"): (session_id, agent_id); agent_id is empty for the main agent and is
+Claude Code's id of a subagent (the hook's input "agent_id"; agent-chrome gets it as --agent-id, which the hook adds).
+Its file name: <session_id> for the main agent, <session_id>.<agent_id> for a subagent.
 Fields, in this order: ts, dt, [opened_ts, opened_dt: open.json only], event (open|navigate|claim|needs_human|done|
-message|close|expired|window), session_id, project, job, machine, cwd, profile, device_id, tab_id, url, purpose,
-visibility (invisible|unfocused|focused), visibility_reason, needs_human, expires_ts, message, reply_to.
+message|close|expired|window), session_id, agent_id (null: the main agent), project, job, machine, cwd, profile,
+device_id, tab_id, url, purpose, visibility (invisible|unfocused|focused), visibility_reason, mode (single|subagents:
+where the human answers, the terminal or the tab's side panel), needs_human, expires_ts, message, reply_to.
 expires_ts: when a tab that needs a human is closed if nobody acted (needs_human set + NEEDS_HUMAN_TTL; set by
 record(), so every writer gets it); the extension closes it then and the record says "expired". Headless tabs: profile "headless:<data folder>", tab_id = the CDP target id, device_id null; a
 visible Chrome a script records itself (secrets-and-account-migration's pwlayer): profile "visible:<data folder>".
@@ -33,8 +39,11 @@ from pathlib import Path
 
 STATE = Path(os.environ.get('CHROME_STATE') or Path.home() / 'opt/my-setup/state/chrome')
 OPEN, HISTORY, COMMENTS, SESSIONS = STATE / 'open.json', STATE / 'history', STATE / 'comments.jsonl', STATE / 'sessions'
-FIELDS = ['ts', 'dt', 'event', 'session_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id', 'tab_id',
-          'url', 'purpose', 'visibility', 'visibility_reason', 'needs_human', 'expires_ts', 'message', 'reply_to']
+FIELDS = ['ts', 'dt', 'event', 'session_id', 'agent_id', 'project', 'job', 'machine', 'cwd', 'profile', 'device_id',
+          'tab_id', 'url', 'purpose', 'visibility', 'visibility_reason', 'mode', 'needs_human', 'expires_ts', 'message',
+          'reply_to']
+MODES = ('single', 'subagents')   # authorize-tab --mode: the human answers in the terminal, or in the tab's side panel
+RE_AGENT = re.compile(r'[A-Za-z0-9_-]{1,64}')   # a subagent's id (Claude Code: 17 hex characters)
 # A tab kept for a human is closed after this, if nobody acted: 2 h, the deadline the user set for auto-job-apply
 # (21 Oct 2026). $CHROME_NEEDS_HUMAN_TTL (seconds) overrides it for tests, in the process that marks the need.
 NEEDS_HUMAN_TTL = int(os.environ.get('CHROME_NEEDS_HUMAN_TTL') or 7200)
@@ -158,6 +167,7 @@ def row(ev: dict, d_ctx: dict) -> dict:
     d['dt'] = utc(d['ts'])
     d['machine'] = d.get('machine') or machine_name()
     d['project'] = d.get('project') or project_of(d.get('cwd') or os.getcwd())
+    d['agent_id'] = d.get('agent_id') or None   # null: the main agent
     if 'reply_to' not in d:
         d['reply_to'] = reply_to(d.get('session_id'), d.get('job'))
     return {k: d.get(k) for k in FIELDS}
@@ -192,7 +202,7 @@ def record(l_ev: list[dict], d_ctx: dict | None = None, fanout: dict | None = No
             d_open[key] = {k: new.get(k) for k in FIELDS_OPEN}
         if fanout and l_rows:
             for key, e in d_open.items():
-                if e.get('session_id') == d_ctx.get('session_id'):
+                if owner(e) == (d_ctx.get('session_id'), d_ctx.get('agent_id') or ''):
                     e.update({k: v for k, v in fanout.items() if k != 'needs_human'},
                              ts=l_rows[-1]['ts'], dt=l_rows[-1]['dt'], event=l_rows[-1]['event'])
                     if 'needs_human' in fanout:
@@ -201,16 +211,74 @@ def record(l_ev: list[dict], d_ctx: dict | None = None, fanout: dict | None = No
     return l_rows
 
 
-def session(sid: str | None) -> dict:
-    return read_json(SESSIONS / f'{sid}.json') if sid else {}
+def agent_id(aid: str | None) -> str:
+    """A subagent's id as given (hook input, --agent-id, $CHROME_AGENT_ID), checked; '' for the main agent."""
+    aid = (aid or '').strip()
+    if aid and not RE_AGENT.fullmatch(aid):
+        raise ValueError(f'not an agent id: {aid!r}')
+    return aid
 
 
-def update_session(sid: str, **kw) -> dict:
-    f = SESSIONS / f'{sid}.json'
+def owner(e: dict) -> tuple:
+    """Who a tab (an open.json entry) or a comment belongs to: (session_id, agent_id or '')."""
+    return e.get('session_id'), e.get('agent_id') or ''
+
+
+def key_name(sid: str, aid: str = '') -> str:
+    return f'{sid}.{aid}' if aid else sid
+
+
+def who(aid: str) -> str:
+    return f'subagent {aid}' if aid else 'the main agent'
+
+
+def session(sid: str | None, aid: str = '') -> dict:
+    return read_json(SESSIONS / f'{key_name(sid, aid)}.json') if sid else {}
+
+
+def update_session(sid: str, aid: str = '', **kw) -> dict:
+    f = SESSIONS / f'{key_name(sid, aid)}.json'
     with locked(f):
         d = {**read_json(f), **kw}
         write_json(f, d)
     return d
+
+
+def take_comments(sid: str, aid: str, d_open: dict | None = None) -> list[dict]:
+    """The user's comments for this key not given to it yet; marks them given (a byte offset in its sessions file,
+    under its lock). A comment is the key's when it names the key (the native host copies the tab's session and agent),
+    or, for an old row without a session, one of the key's open tabs and was written after that tab opened (Chrome
+    reuses tab ids). Used by the hook (next to any tool call) and by agent-chrome wait-for-human."""
+    if not COMMENTS.exists():
+        return []
+    d_open = read_open() if d_open is None else d_open
+    f_sess = SESSIONS / f'{key_name(sid, aid)}.json'
+    with locked(f_sess):
+        d_sess = read_json(f_sess)
+        off = d_sess.get('comments_offset', 0)
+        with open(COMMENTS, 'rb') as f:
+            f.seek(off)
+            chunk = f.read()
+        chunk = chunk[:chunk.rfind(b'\n') + 1]  # a line still being written waits for the next call
+        if not chunk:
+            return []
+        l_mine = []
+        for line in chunk.decode(errors='replace').splitlines():
+            try:
+                c = json.loads(line)
+            except ValueError:
+                continue
+            tab = d_open.get(str(c.get('tab_id')))
+            if (c.get('session_id') and owner(c) == (sid, aid)) or (
+                    not c.get('session_id') and tab and owner(tab) == (sid, aid) and c.get('ts', 0) >= tab.get('opened_ts', 0)):
+                l_mine.append(c)
+        SESSIONS.mkdir(parents=True, exist_ok=True)
+        write_json(f_sess, {**d_sess, 'comments_offset': off + len(chunk)})
+    return l_mine
+
+
+def comments_pending(sid: str, aid: str = '') -> bool:
+    return COMMENTS.exists() and COMMENTS.stat().st_size > session(sid, aid).get('comments_offset', 0)
 
 
 def profile_for(cwd: str, project: str | None = None) -> str:

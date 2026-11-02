@@ -115,6 +115,7 @@ OWN_BINS=(
     "cc_map.py:cc-map"
     "cc_rc.py:cc-rc"
     "gws_login.sh:gws-login"
+    "tm.sh:tm"
 )
 
 _deploy_own_bin() {

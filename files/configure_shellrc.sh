@@ -116,3 +116,28 @@ export PS1="\[\033[3;${_bh_user_color}m\]\u\[\033[m\]@\[\033[38;5;${HOST_COLOR}m
 unset _bh_user_color
 EOF
 fi
+
+# --- tm (files/tm.sh): Tab completes the folder names in ~/dev, or a path
+# once the word has a "/" or starts with ".". zsh: compdef when compinit
+# is loaded (on the Mac, nvm's bash_completion loads it above this block),
+# else the old compctl, which needs nothing. ---
+if [ "$TARGET_SHELL" = "zsh" ]; then
+    cat << 'EOF'
+
+_tm() {
+    if [[ $PREFIX == */* || $PREFIX == .* ]]; then _path_files -/
+    else _path_files -/ -W "$HOME/dev"; fi
+}
+if (( $+functions[compdef] )); then compdef _tm tm; else compctl -/ -W "$HOME/dev" tm; fi
+EOF
+elif [ "$TARGET_SHELL" = "bash" ]; then
+    cat << 'EOF'
+
+_tm() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ $cur == */* || $cur == .* ]]; then COMPREPLY=($(compgen -d -- "$cur"))
+    else COMPREPLY=($(cd "$HOME/dev" 2>/dev/null && compgen -d -- "$cur")); fi
+}
+complete -o filenames -F _tm tm
+EOF
+fi

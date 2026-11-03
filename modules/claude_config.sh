@@ -74,8 +74,8 @@ with open(settings_path, "w") as f:
 # front, our whatsapp skill replaces it).
 # permissions: deny rules that keep every agent out of the user's own Chrome profile (Default), which holds their
 # password vault (user, 2026-10-20); the agents' rule is in files/AGENTS_LOCAL.md "Chrome profiles".
-# Allow rules: an agent completes or deletes its own Todoist tasks with the `task` command without asking
-# (user, 2026-11-03: auto mode's classifier had blocked them as external writes).
+# Allow rules: an agent adds, edits, completes or deletes its own Todoist tasks with the `task` command without
+# asking (user, 2026-11-03: auto mode's classifier had blocked them as external writes).
 # remoteControlAtStartup: every interactive session turns on Remote Control (/rc) by itself, so it
 # shows in the Claude app (user, 2026-10-22).
 for key in respondToBashCommands theme statusLine cleanupPeriodDays autoMemoryEnabled skillOverrides pluginConfigs permissions remoteControlAtStartup; do

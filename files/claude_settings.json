@@ -29,6 +29,8 @@
   },
   "permissions": {
     "allow": [
+      "Bash(task add:*)",
+      "Bash(task edit:*)",
       "Bash(task complete:*)",
       "Bash(task delete:*)"
     ],

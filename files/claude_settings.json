@@ -28,6 +28,10 @@
     }
   },
   "permissions": {
+    "allow": [
+      "Bash(task complete:*)",
+      "Bash(task delete:*)"
+    ],
     "deny": [
       "Read(~/Library/Application Support/Google/Chrome/Default/**)",
       "Edit(~/Library/Application Support/Google/Chrome/Default/**)",

@@ -79,7 +79,7 @@ Place.setReport(report);
 function connect() {
   if (port) return;
   try { port = chrome.runtime.connectNative(HOST); } catch (e) { console.warn("native host", e); return; }
-  port.onMessage.addListener(m => { if (m.notes) apply(m.notes); if (m.expire) expire(m.expire); });
+  port.onMessage.addListener(m => { if (m.notes) apply(m.notes); if (m.expire) expire(m.expire); });   // m.ping: nothing to do
   port.onDisconnect.addListener(() => { console.warn("native host gone", chrome.runtime.lastError?.message); port = null; setTimeout(connect, 5000); });
   port.postMessage({ hello: 1 });   // the host then sends {notes} at once and after every change of the record
   report();
@@ -110,6 +110,10 @@ chrome.tabs.onUpdated.addListener((tabId, info) => { if (info.status === "comple
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {});   // click the icon = the panel
 chrome.windows.onCreated.addListener(w => Place.created(w), { windowTypes: ["normal"] });
 chrome.windows.onRemoved.addListener(wid => Place.removed(wid), { windowTypes: ["normal"] });
+// Awake: the host pings every 20 s (an idle port let Chrome 156 stop this worker after ~30 s, 4 Nov 2026); if the
+// worker was stopped anyway, this alarm (30 s, Chrome's minimum) wakes it and connect() reopens the port.
+chrome.alarms.create("keepalive", { periodInMinutes: 0.5 });
+chrome.alarms.onAlarm.addListener(a => { if (a.name === "keepalive") connect(); });
 chrome.runtime.onStartup.addListener(() => { Place.startup(); connect(); });
 chrome.runtime.onInstalled.addListener(connect);
 chrome.storage.session.get("notes").then(r => { notes = r.notes || {}; connect(); });

@@ -9,7 +9,7 @@ their replies), comments.jsonl (the user's comments). Writes one line to comment
 side panel: ts, dt, session_id, agent_id (the tab's owner), tab_id, url, text (hook.py gives it to the session). Writes windows/<profile>.json
 while the extension runs: ts, dt, pid, profile, windows (ids), projects ({project: its agent window}); removed when
 the extension goes (agent-chrome open-profile-window reads it: does this profile have a window?).
-Sends the extension {"notes": {tab_id: entry + "thread"}}, event "done" when the session's last need event since the
+Sends {"ping": ts} every PING_S seconds without other message (keeps the extension awake). Sends the extension {"notes": {tab_id: entry + "thread"}}, event "done" when the session's last need event since the
 tab opened is "done" (so the bar keeps "✓ done" after a reply or a navigation), at start and after every change of those files: only
 Claude in Chrome tabs (device_id set) opened since the user's Chrome started (Chrome reuses tab ids after a restart).
 Expiry (the deadline of a tab kept for a human, expires_ts in open.json; chrome_kit.NEEDS_HUMAN_TTL): once past it,
@@ -40,6 +40,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import chrome_kit as kit  # noqa: E402
 
 lock_out = threading.Lock()
+# Chrome 156 put the extension's service worker to sleep after ~30 s with no message on its port, though an open
+# native port should keep it awake (Chrome docs, "Chrome 105"): the port closed, this host exited, and the kit's
+# record lost its windows and notes until the next tab event (measured 4 Nov 2026). A message every PING_S resets
+# the worker's idle timer; the extension's 30 s alarm wakes it again if it still sleeps.
+PING_S = 20
 d_mine = {'windows_file': None}   # the windows/<profile>.json this host wrote: removed when Chrome closes the port
 
 
@@ -189,12 +194,16 @@ def main():
                 expired(m['expired'])
 
     threading.Thread(target=reader, daemon=True).start()
-    last, d_notes, s_sent = None, {}, set()
+    last, d_notes, s_sent, t_ping = None, {}, set(), time.monotonic()
     while True:
         now = stamp()
         if now != last:
             last, d_notes = now, notes()
             send({'notes': d_notes})
+            t_ping = time.monotonic()
+        if time.monotonic() - t_ping >= PING_S:   # keeps the extension awake (see PING_S)
+            send({'ping': int(time.time())})
+            t_ping = time.monotonic()
         l_due = [int(k) for k, e in d_notes.items() if e.get('needs_human') and e.get('expires_ts')
                  and e['expires_ts'] <= time.time() and (k, e['expires_ts']) not in s_sent]
         if l_due:                                     # once per tab and deadline: the extension that holds it closes it

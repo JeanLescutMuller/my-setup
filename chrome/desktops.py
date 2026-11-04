@@ -17,6 +17,7 @@ from __future__ import annotations  # "str | None" hints on Python 3.9
 import ctypes
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -32,6 +33,8 @@ _SL = ctypes.CDLL('/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight
 _P = ctypes.c_void_p
 UTF8 = 0x08000100
 CACHE = kit.WINDOWS / 'desktop-windows.json'
+# iTerm2 runs click commands with PATH=/usr/bin:/bin:/usr/sbin:/sbin: Homebrew's tmux by its full path (4 Nov 2026)
+TMUX = shutil.which('tmux') or next((p for p in ('/opt/homebrew/bin/tmux', '/usr/local/bin/tmux') if os.path.exists(p)), 'tmux')
 
 
 class _Rect(ctypes.Structure):
@@ -171,8 +174,8 @@ def session_ttys() -> list:
     """The terminals that show this shell: the clients of its tmux session, else the shell's own terminal."""
     if os.environ.get('TMUX'):
         pane = ['-t', os.environ['TMUX_PANE']] if os.environ.get('TMUX_PANE') else []
-        sess = subprocess.run(['tmux', 'display', '-p', *pane, '#{session_name}'], capture_output=True, text=True).stdout.strip()
-        out = subprocess.run(['tmux', 'list-clients', '-t', sess, '-F', '#{client_tty}'], capture_output=True, text=True).stdout
+        sess = subprocess.run([TMUX, 'display', '-p', *pane, '#{session_name}'], capture_output=True, text=True).stdout.strip()
+        out = subprocess.run([TMUX, 'list-clients', '-t', sess, '-F', '#{client_tty}'], capture_output=True, text=True).stdout
         return out.split()
     pid = os.getpid()
     for _ in range(20):   # up the parents: the first one with a terminal
@@ -218,7 +221,7 @@ def clicked_folder() -> str | None:
     """The folder of the terminal the user just clicked in (iTerm2's current session): its tmux client's pane folder;
     None when it shows no tmux session."""
     tty = osa('if application "iTerm2" is running then tell application "iTerm2" to get tty of current session of current window')
-    r = subprocess.run(['tmux', 'display', '-p', '-c', tty, '#{pane_current_path}'], capture_output=True, text=True) if tty else None
+    r = subprocess.run([TMUX, 'display', '-p', '-c', tty, '#{pane_current_path}'], capture_output=True, text=True) if tty else None
     return r.stdout.strip() or None if r and r.returncode == 0 else None
 
 

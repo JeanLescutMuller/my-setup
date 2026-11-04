@@ -1,6 +1,6 @@
 ---
 name: chrome
-description: How an agent uses Chrome on this Mac - the 5 questions to answer first (may I open a tab, which profile, headless or visible, which window, focus), the agent-chrome command (authorize-tab, mark-as-needing-human, mark-as-human-done, reply-to-human, status, open-profile-window), the headless launcher for scripts, what was tested, and how to find and close Chrome windows and tabs left open. Use before any browser work, any Claude in Chrome tool, any Playwright/CDP script or test that starts Chrome, before opening a Chrome window or tab, and when the user asks who opened a window or tab or asks to clean up Chrome.
+description: How an agent uses Chrome on this Mac - showing the user an HTML page or URL on the session's own desktop (agent-chrome show), the 5 questions to answer first (may I open a tab, which profile, headless or visible, which window, focus), the agent-chrome command (authorize-tab, mark-as-needing-human, mark-as-human-done, reply-to-human, status, open-profile-window), the headless launcher for scripts, what was tested, and how to find and close Chrome windows and tabs left open. Use before any browser work, before showing the user an HTML file or a page, any Claude in Chrome tool, any Playwright/CDP script or test that starts Chrome, before opening a Chrome window or tab, and when the user asks who opened a window or tab or asks to clean up Chrome.
 ---
 
 # Chrome for agents
@@ -82,6 +82,27 @@ Inside a Claude session, `headless()` first requires `agent-chrome authorize-tab
 
 Never in front of the user. Claude in Chrome actions (create a tab, navigate, click, screenshot) never bring Chrome forward (tested 2026-11-01). Opening a window always takes the focus for a moment, so only `open-profile-window` does it, and it gives the focus back at once. Never use side-panel or notification actions.
 
+## Showing the user a page: `agent-chrome show`
+
+To show the user an HTML file or a URL (a report, a design, a README.html), run `agent-chrome show <full path or URL>` instead of `open`: the page opens **on the desktop of this session's terminal**, never on another desktop (the user, 4 Nov 2026). No authorize-tab needed: the user reads the page, no agent drives it.
+
+```
+this session's desktop: tmux session → its attached terminal → iTerm2 window → its desktop (macOS, read-only)
+ ├─ no iTerm2 window shows the session (the user is on the phone)      → exit 3: send an Artifact instead
+ ├─ the profile already has a window on that desktop                   → a new tab in it (one window per profile and desktop)
+ ├─ that desktop is shown now                                          → a new window of the profile, moved onto that screen if needed
+ └─ that desktop is not shown (the user is on another one)             → exit 2, nothing opens: give the full path
+```
+
+| | |
+|---|---|
+| profile | `--profile NAME`, else the session's (question 2), else the project's (`Claude - general` for most); never the user's own |
+| the page | comes to the front (the user asked to see it) |
+| record | `show` / `show_window` events in the history (`agent-chrome status --since 1h`) |
+| desktops | each screen has its own desktops; a window's profile is read from its title, only for windows on desktops shown now, and kept in `state/chrome/windows/desktop-windows.json` |
+
+**The user's clicks** on a full path in iTerm2 go through the same command, set once by hand in iTerm2: Settings → Profiles → (each profile used) → Advanced → Semantic History → "Run command…" → `/Users/jeanlescut/.local/bin/agent-chrome show --clicked \1`. A clicked `.html` opens in `Claude - general` on the desktop of the clicked iTerm2 window; any other path opens as before (`open`); on any error the path opens with `open` too, and `state/chrome/show-clicks.log` says why.
+
 ## Two modes: where the human answers
 
 | `--mode` | Who has the tab | Where the human answers | How the agent hears it |
@@ -114,6 +135,7 @@ In subagents mode the tab, its needs-human, comments and expiry belong to (sessi
 | `reply-to-human "<text>"` | | | the agent's answer in the tab's thread |
 | `status` | | `--mine`, `--since 7d`, `--project P`, `--json` | open agent tabs (when, session, project, why, needs human), running Chromes, BLIND warning; history with `--since` |
 | `open-profile-window` | | `--project P` | the project's profile window, in the background |
+| `show <file or URL>` | | `--profile NAME`, `--clicked` (iTerm2's click) | the page on this session's desktop (above) |
 
 The 4 session commands work only inside a Claude Code session. `chrome-claim` and `chrome-who` are the old names, kept until 2026-11-08. Options table: `~/dev/my-setup/doc/chrome-visibility/agent-chrome-options.html`.
 

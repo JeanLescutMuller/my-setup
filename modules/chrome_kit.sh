@@ -2,7 +2,7 @@
 # The Chrome kit (macOS only): every agent's Chrome use recorded and its rules enforced.
 #
 #   chrome/*.py (not tests/)  ->  ~/opt/my-setup/chrome/      hook.py, chrome_kit.py, agent_chrome.py, launch_headless.py,
-#                                                             native_host.py, chrome_claim.py + chrome_who.py (old names)
+#                                                             native_host.py, desktops.py (macOS desktops, for agent-chrome show), chrome_claim.py + chrome_who.py (old names)
 #   chrome/extension/         ->  ~/opt/my-setup/chrome/extension/   the "Agent tab notes" extension: the user loads
 #                                                             it once per agent profile (chrome://extensions, Load unpacked)
 #   ~/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.jeanlescut.agent_tab_notes.json

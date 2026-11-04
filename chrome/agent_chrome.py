@@ -9,6 +9,7 @@
   agent-chrome wait-for-human [--timeout SECONDS]
   agent-chrome status [--mine] [--since 7d] [--project P] [--json]
   agent-chrome open-profile-window [--project P]
+  agent-chrome show FILE_OR_URL [--profile NAME] [--clicked]
 
 The Chrome kit (my-setup chrome/, skill chrome). --visibility, enforced by the kit's hook and launcher:
   invisible  only a headless Chrome from the launcher (launch_headless.py): every Claude in Chrome tab is refused;
@@ -204,6 +205,133 @@ def open_profile_window(project: str, sid: str | None, cwd: str, ctx: dict):
           + (f'; focus given back to {before}' + (f' (window {win_before})' if before == 'Google Chrome' else '') if given_back else '') + '.')
 
 
+# ---------------------------------------------------------------- show: a page for the user, on the session's desktop
+HTML = ('.html', '.htm')
+CLICK_LOG = kit.STATE / 'show-clicks.log'   # --clicked has no terminal: what happened goes here
+
+
+def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, cwd: str, ctx: dict) -> int:
+    """Show the user a page (a file or a URL) in a Chrome window ON THIS SESSION'S DESKTOP: the desktop of the iTerm2
+    window that shows this session (--clicked: the iTerm2 window the user clicked in). One window per (profile,
+    desktop): a window of the profile already on that desktop gets a new tab; else, if that desktop is shown now, a new
+    window of the profile is opened and placed on that desktop's screen; else nothing opens (no program can put a
+    window on a desktop that is not shown). The profile: --profile, else the session's, else the project's
+    (--clicked: Claude - general); never the user's own. The page comes to the front. Returns the exit code: 0 shown,
+    2 not shown (the reason printed), 3 no iTerm2 window shows this session (the user is on the phone: send an Artifact)."""
+    import desktops as dk   # macOS calls: only this subcommand needs them
+    me = f'{PROG} show'
+    if re.match(r'[a-z][a-z0-9+.-]*://', target):
+        url, path = target, None
+    else:
+        path = Path(target).expanduser().resolve()
+        if not path.exists():
+            print(f'{me}: no such file: {path}')
+            return 2
+        url = path.as_uri()
+    if clicked and (path is None or path.is_dir() or path.suffix.lower() not in HTML):
+        subprocess.run(['open', str(path or url)])   # not a page: what iTerm2 does by default
+        return 0
+    d_sess = kit.session(sid)
+    profile = 'Claude - general' if clicked else (profile_arg or d_sess.get('profile') or kit.profile_for(cwd, ctx.get('project')))
+    project = ctx.get('project') or kit.project_of(cwd)
+    l_ok = next((l for n, l in kit.D_DEVICE.values() if n == profile), None)
+    if l_ok and project not in kit.projects_of(l_ok):
+        print(f'{me}: refused: "{profile}" is only for {" or ".join(sorted(kit.projects_of(l_ok)))} (project here: {project})')
+        return 2
+    folder = kit.profile_folders().get(profile)
+    if not folder or folder == 'Default':   # Default: the user's own profile, never
+        print(f'{me}: refused: no agent Chrome profile named "{profile}" in {kit.LOCAL_STATE}')
+        return 2
+    l_main = [p['pid'] for p in kit.chrome_processes() if p['kind'] == "user's Chrome"]
+    if not l_main:
+        print(f"{me}: Chrome is not running: ask the user to start it (starting it from here would also reopen their own profile)")
+        return 2
+    pid = l_main[0]
+
+    space, term_rect, d_lay = dk.session_desktop(clicked)
+    if space is None:
+        print(f'{me}: no iTerm2 window shows this session (the user is away from the Mac, or on the phone): '
+              f'send it as an Artifact instead. Page: {path or url}')
+        return 3
+    where = dk.label(space, d_lay)
+    if d_lay.get(space, {}).get('fullscreen'):
+        print(f"{me}: this session's terminal is full screen ({where}): a Chrome window cannot go there. Page: {path or url}")
+        return 2
+    shown = d_lay.get(space, {}).get('shown')
+
+    l_cg = dk.windows(pid)
+    d_spaces = {w['id']: dk.spaces_of(w['id']) for w in l_cg}
+    l_cg = [w for w in l_cg if d_spaces[w['id']]]   # Chrome's hidden helper windows are on no desktop
+    d_prof = dk.profiles(pid, l_cg)
+    l_as = dk.chrome_windows(pid)
+    w = dk.pick(l_cg, d_prof, profile, space, d_spaces)
+    as_id = w and dk.as_id_of(w['rect'], l_as)
+    ev = {'event': 'show', 'profile': profile, 'url': url, 'purpose': f'show the user {path or url}',
+          'message': f'on {where}' + (' (clicked)' if clicked else '')}
+    if as_id:   # reuse: a new tab in the window this profile already has on this desktop
+        dk.osa(f'tell application "Google Chrome" to tell window id {as_id}\n'
+               f' make new tab at end of tabs with properties {{URL:"{url}"}}\n'
+               ' set active tab index to (count of tabs)\nend tell')
+        if shown:
+            dk.osa(f'tell application "Google Chrome"\n set index of window id {as_id} to 1\n activate\nend tell')
+        kit.record([ev], ctx)
+        print(f'{me}: opened in a new tab of the "{profile}" window already on {where}'
+              + ('' if shown else ' (that desktop is not shown now: the tab waits there)') + '.')
+        return 0
+    if not shown:
+        print(f'{me}: not opened: this session\'s desktop ({where}) is not shown now, and "{profile}" has no window there '
+              f'that the kit knows. Ask the user to switch to it, then run this again; or give them the path: {path or url}')
+        return 2
+
+    # a new window of the profile; new windows open on the desktop shown on the focused screen: moved below if needed
+    s_as, s_cg = {x['as_id'] for x in l_as}, {x['id'] for x in dk.windows(pid)}
+    subprocess.Popen([os.environ.get('CHROME_WINDOW_CMD') or CHROME_BIN, f'--profile-directory={folder}', '--new-window', url],
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    t0, new = time.monotonic(), None
+    while time.monotonic() - t0 < 10 and not new:
+        time.sleep(0.3)
+        new = next((x for x in dk.chrome_windows(pid) if x['as_id'] not in s_as), None)
+    if not new:
+        print(f'{me}: Chrome did not open a window of "{profile}" within 10 s. Page: {path or url}')
+        return 2
+    cg = dk.cg_of(new['rect'], dk.windows(pid), exclude=s_cg) or {}
+    on = dk.spaces_of(cg['id']) if cg else []
+    if space not in on and term_rect:   # opened on the other screen: put it on the terminal's screen (its shown desktop)
+        x, y, w_, h = term_rect
+        dk.osa(f'tell application "Google Chrome" to set bounds of window id {new["as_id"]} to {{{x}, {y}, {x + w_}, {y + h}}}')
+        time.sleep(0.5)
+        on = dk.spaces_of(cg['id']) if cg else []
+    if cg:
+        dk.remember({}, cg['id'], profile)
+    dk.osa(f'tell application "Google Chrome"\n set index of window id {new["as_id"]} to 1\n activate\nend tell')
+    kit.record([{**ev, 'event': 'show_window'}], ctx)
+    if space in on:
+        print(f'{me}: opened a new "{profile}" window on {where} (checked).')
+        return 0
+    print(f'{me}: WARNING: the new "{profile}" window is on {", ".join(dk.label(s, d_lay) for s in on) or "an unknown desktop"}, '
+          f'not on {where}.')
+    return 2
+
+
+def show_clicked(target: str, ctx: dict):
+    """iTerm2's click on a path (Semantic History, "Run command"): never fails silently: logged, and on any error the
+    path opens as macOS would (open)."""
+    import contextlib
+    import io
+    buf = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(buf):
+            rc = show(target, None, True, None, ctx['cwd'], ctx)
+    except Exception as e:   # noqa: BLE001: the click must still open something
+        buf.write(f'error: {e!r}\n')
+        rc = 1
+    if rc != 0:
+        subprocess.run(['open', target])
+    CLICK_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(CLICK_LOG, 'a') as f:
+        f.write(f'{kit.utc(int(time.time()))} rc={rc} {target}: {buf.getvalue().strip()}\n')
+
+
 # ---------------------------------------------------------------- wait-for-human
 WAIT_MAX = 300
 
@@ -271,6 +399,13 @@ def parser() -> argparse.ArgumentParser:
     p = sub.add_parser('open-profile-window', help="Claude in Chrome's profile not connected: open its window, in the background",
                        description=open_profile_window.__doc__.split('Exits')[0].strip())
     p.add_argument('--project', metavar='P', help="this project instead of the session's authorized one, else the current folder's")
+    p = sub.add_parser('show', help="show the user a page (HTML file or URL) on this session's desktop",
+                       description=show.__doc__)
+    p.add_argument('target', metavar='FILE_OR_URL', help='an HTML file (any path) or a URL')
+    p.add_argument('--profile', metavar='NAME', help='the agent Chrome profile (default: the session\'s, else the project\'s)')
+    p.add_argument('--clicked', action='store_true', help="iTerm2's click on a path (Semantic History): the clicked iTerm2 "
+                                                          'window, profile Claude - general, a non-HTML path opens as usual, '
+                                                          f'what happened in {CLICK_LOG}')
     return ap
 
 
@@ -307,6 +442,11 @@ def main(argv: list | None = None):
     if a.cmd == 'status':
         status(a, sid)
         return
+    if a.cmd == 'show':
+        if a.clicked:
+            show_clicked(a.target, ctx)
+            return
+        sys.exit(show(a.target, a.profile, False, sid, cwd, ctx))
     if a.cmd == 'open-profile-window':
         open_profile_window(a.project or d_sess.get('project') or kit.project_of(os.getcwd()), sid, os.getcwd(), ctx)
         return

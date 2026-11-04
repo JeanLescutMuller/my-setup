@@ -222,19 +222,21 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
     import desktops as dk   # macOS calls: only this subcommand needs them
     me = f'{PROG} show'
     if re.match(r'[a-z][a-z0-9+.-]*://', target):
-        url, path = target, None
+        url, path = target.replace('"', '%22'), None   # the URL goes inside an AppleScript string
     else:
         path = Path(target).expanduser().resolve()
         if not path.exists():
             print(f'{me}: no such file: {path}')
             return 2
         url = path.as_uri()
-    if clicked and (path is None or path.is_dir() or path.suffix.lower() not in HTML):
-        subprocess.run(['open', str(path or url)])   # not a page: what iTerm2 does by default
+    # clicked: web links (iTerm2's Smart Selection rule) and HTML files (its Semantic History); anything else opens
+    # as iTerm2 would by default
+    if clicked and (not re.match(r'(https?|file)://', url) or (path and (path.is_dir() or path.suffix.lower() not in HTML))):
+        subprocess.run(['open', str(path or target)])
         return 0
     d_sess = kit.session(sid)
     if clicked:   # the project of the terminal clicked in (its tmux pane's folder), else of the file
-        cwd = dk.clicked_folder() or str(path.parent)
+        cwd = dk.clicked_folder() or str(path.parent if path else Path.home())
         ctx = {**ctx, 'cwd': cwd, 'project': None}
     project = ctx.get('project') or kit.project_of(cwd)
     profile = profile_arg or d_sess.get('profile') or kit.profile_for(cwd, project)

@@ -102,7 +102,7 @@ this session's desktop: tmux session → its attached terminal → iTerm2 window
 | record | `show` / `show_window` events in the history (`agent-chrome status --since 1h`) |
 | desktops | each screen has its own desktops; the windows the kit opened, with their project and profile: `state/chrome/windows/desktop-windows.json` |
 
-**The user's clicks** on a full path in iTerm2 go through the same command, set once by hand in iTerm2: Settings → Profiles → (each profile used) → Advanced → Semantic History → "Run command…" → `/Users/jeanlescut/.local/bin/agent-chrome show --clicked \1`. A clicked `.html` opens on the desktop of the clicked iTerm2 window, in the window of that terminal's project (its tmux pane's folder, else the file's folder); any other path opens as before (`open`); on any error the path opens with `open` too, and `state/chrome/show-clicks.log` says why.
+**The user's clicks** in iTerm2 go through the same command, set once by hand in iTerm2 (Settings → Profiles → Default → Advanced): file paths by Semantic History → "Run command…" → `/Users/jeanlescut/.local/bin/agent-chrome show --clicked \1`; web links (`http://…`, which Semantic History never sees) by a Smart Selection rule (Edit… → +, precision Very High, regex `https?://[^\s<>"'`]*[^\s<>"'`.,;:!?)\]]`, action "Run Command…" `/Users/jeanlescut/.local/bin/agent-chrome show --clicked \0`). A clicked `.html` or web link opens on the desktop of the clicked iTerm2 window, in the window of that terminal's project (its tmux pane's folder, else the file's folder); any other path opens as before (`open`); on any error the path opens with `open` too, and `state/chrome/show-clicks.log` says why.
 
 ## Two modes: where the human answers
 

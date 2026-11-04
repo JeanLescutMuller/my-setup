@@ -1,16 +1,16 @@
 """macOS desktops (Spaces) for the Chrome kit: which desktop a window is on, which desktop each screen shows now,
-the iTerm2 window of a Claude session, and Chrome's windows with their profile.
+the iTerm2 window of a Claude session, and the Chrome window the kit opened for each project.
 
 macOS has no public API for desktops: SkyLight's private calls are read here (read-only; they work with SIP on,
 tested on macOS 26.6, 4 Nov 2026), with the public window list (CoreGraphics), through ctypes: standard library only
 (the kit runs on /usr/bin/python3). Facts measured on this Mac (4 Nov 2026):
   - each screen has its own desktops ("Displays have separate Spaces", the macOS default);
   - iTerm2's AppleScript window id is the macOS window number (CGWindowID);
-  - a Chrome window's profile is only in its accessibility title ("<page> - Google Chrome – <profile>"), and only
-    for windows on the desktops shown now: the profile of each window seen is kept in windows/desktop-windows.json;
+  - a Chrome window's project is known only for the windows the kit opened (agent-chrome show): one window per
+    project (two projects on one desktop with the same profile get two windows; the user, 4 Nov 2026);
   - no program can move a window to a desktop that is not shown (macOS 26, SIP on): a window gets on a desktop by
     being created while that desktop is shown, on that desktop's screen.
-Reads and writes $CHROME_STATE/windows/desktop-windows.json ({CGWindowID: {profile, ts}}).
+Reads and writes $CHROME_STATE/windows/desktop-windows.json ({CGWindowID: {project, profile, ts}}).
 """
 from __future__ import annotations  # "str | None" hints on Python 3.9
 
@@ -32,7 +32,6 @@ _SL = ctypes.CDLL('/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight
 _P = ctypes.c_void_p
 UTF8 = 0x08000100
 CACHE = kit.WINDOWS / 'desktop-windows.json'
-RE_PROFILE = re.compile(r' - Google Chrome – (.+)$')   # an en dash before the profile name
 
 
 class _Rect(ctypes.Structure):
@@ -215,26 +214,15 @@ def session_desktop(clicked: bool = False):
     return (*(l_cand[0] if l_cand else (None, None)), d_lay)
 
 
-# ---------------------------------------------------------------- Chrome's windows and their profile
-def profile_of_title(title: str) -> str | None:
-    m = RE_PROFILE.search(title or '')
-    return m.group(1).strip() if m else None
+def clicked_folder() -> str | None:
+    """The folder of the terminal the user just clicked in (iTerm2's current session): its tmux client's pane folder;
+    None when it shows no tmux session."""
+    tty = osa('if application "iTerm2" is running then tell application "iTerm2" to get tty of current session of current window')
+    r = subprocess.run(['tmux', 'display', '-p', '-c', tty, '#{pane_current_path}'], capture_output=True, text=True) if tty else None
+    return r.stdout.strip() or None if r and r.returncode == 0 else None
 
 
-def ax_windows(pid: int) -> list:
-    """Chrome's windows as accessibility sees them (only on the desktops shown now): [(rect, profile)]."""
-    out = osa(f'tell application "System Events" to tell (first process whose unix id is {pid})\n set out to ""\n'
-              ' repeat with w in windows\n set p to position of w\n set s to size of w\n'
-              '  set out to out & (item 1 of p) & "|" & (item 2 of p) & "|" & (item 1 of s) & "|" & (item 2 of s) & "|" & (name of w) & linefeed\n'
-              ' end repeat\n return out\nend tell')
-    l = []
-    for line in out.splitlines():
-        parts = line.split('|', 4)
-        if len(parts) == 5 and all(re.fullmatch(r'-?\d+', p) for p in parts[:4]):
-            l.append((tuple(int(p) for p in parts[:4]), profile_of_title(parts[4])))
-    return l
-
-
+# ---------------------------------------------------------------- Chrome's windows, one per project
 def chrome_windows(pid: int) -> list:
     """Chrome's AppleScript windows: [{'as_id', 'rect': (x, y, w, h)}] (its ids are not CGWindowIDs: matched by rect)."""
     out = osa('if application "Google Chrome" is running then tell application "Google Chrome"\n set out to ""\n'
@@ -250,30 +238,28 @@ def chrome_windows(pid: int) -> list:
     return l
 
 
-def profiles(pid: int, l_cg: list) -> dict:
-    """{CGWindowID: profile} for Chrome's windows: what accessibility sees now, else what the kit saw before (the
-    cache, cleaned of windows that are gone)."""
-    d_cache = {int(k): v for k, v in kit.read_json(CACHE).items() if k.isdigit()}
+def project_windows(l_cg: list) -> dict:
+    """{CGWindowID: {project, profile, ts}}: the windows the kit opened for a project and that still exist (the
+    record, cleaned of windows that are gone)."""
     s_ids = {w['id'] for w in l_cg}
-    d_cache = {k: v for k, v in d_cache.items() if k in s_ids}
-    for rect, prof in ax_windows(pid):
-        for w in l_cg:
-            if prof and w['rect'] == rect:
-                d_cache[w['id']] = {'profile': prof, 'ts': int(time.time())}
-    remember(d_cache)
-    return {k: v['profile'] for k, v in d_cache.items()}
-
-
-def remember(d_cache: dict, wid: int | None = None, profile: str | None = None):
-    if wid is not None:
-        d_cache = {**{int(k): v for k, v in kit.read_json(CACHE).items() if k.isdigit()}, wid: {'profile': profile, 'ts': int(time.time())}}
+    d = {int(k): v for k, v in kit.read_json(CACHE).items() if k.isdigit() and int(k) in s_ids}
     CACHE.parent.mkdir(parents=True, exist_ok=True)
-    kit.write_json(CACHE, {str(k): v for k, v in d_cache.items()})
+    kit.write_json(CACHE, {str(k): v for k, v in d.items()})
+    return d
 
 
-def pick(l_cg: list, d_prof: dict, profile: str, space: int, d_spaces: dict) -> dict | None:
-    """The front-most window of this profile on this desktop (the window list is front to back), else None."""
-    return next((w for w in l_cg if d_prof.get(w['id']) == profile and space in d_spaces.get(w['id'], [])), None)
+def remember(wid: int, project: str, profile: str):
+    d = kit.read_json(CACHE)
+    d[str(wid)] = {'project': project, 'profile': profile, 'ts': int(time.time())}
+    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    kit.write_json(CACHE, d)
+
+
+def pick(l_cg: list, d_win: dict, project: str, profile: str, space: int, d_spaces: dict) -> dict | None:
+    """The front-most window the kit opened for this project, in this profile, on this desktop (the window list is
+    front to back), else None. Never a window of another project, even in the same profile."""
+    return next((w for w in l_cg if (d_win.get(w['id']) or {}).get('project') == project
+                 and d_win[w['id']].get('profile') == profile and space in d_spaces.get(w['id'], [])), None)
 
 
 def as_id_of(rect: tuple, l_as: list) -> int | None:

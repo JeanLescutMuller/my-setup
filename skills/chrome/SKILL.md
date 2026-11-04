@@ -89,19 +89,20 @@ To show the user an HTML file or a URL (a report, a design, a README.html), run 
 ```
 this session's desktop: tmux session → its attached terminal → iTerm2 window → its desktop (macOS, read-only)
  ├─ no iTerm2 window shows the session (the user is on the phone)      → exit 3: send an Artifact instead
- ├─ the profile already has a window on that desktop                   → a new tab in it (one window per profile and desktop)
- ├─ that desktop is shown now                                          → a new window of the profile, moved onto that screen if needed
+ ├─ the kit already opened a window for this project on that desktop  → a new tab in it (one window per project)
+ ├─ that desktop is shown now                                          → a new window of the project's profile, moved onto that screen if needed
  └─ that desktop is not shown (the user is on another one)             → exit 2, nothing opens: give the full path
 ```
 
 | | |
 |---|---|
+| project | the session's, else the folder's; one window per project: two projects on one desktop get two windows, even in the same profile (the user, 4 Nov 2026); a window the kit did not open is never used |
 | profile | `--profile NAME`, else the session's (question 2), else the project's (`Claude - general` for most); never the user's own |
 | the page | comes to the front (the user asked to see it) |
 | record | `show` / `show_window` events in the history (`agent-chrome status --since 1h`) |
-| desktops | each screen has its own desktops; a window's profile is read from its title, only for windows on desktops shown now, and kept in `state/chrome/windows/desktop-windows.json` |
+| desktops | each screen has its own desktops; the windows the kit opened, with their project and profile: `state/chrome/windows/desktop-windows.json` |
 
-**The user's clicks** on a full path in iTerm2 go through the same command, set once by hand in iTerm2: Settings → Profiles → (each profile used) → Advanced → Semantic History → "Run command…" → `/Users/jeanlescut/.local/bin/agent-chrome show --clicked \1`. A clicked `.html` opens in `Claude - general` on the desktop of the clicked iTerm2 window; any other path opens as before (`open`); on any error the path opens with `open` too, and `state/chrome/show-clicks.log` says why.
+**The user's clicks** on a full path in iTerm2 go through the same command, set once by hand in iTerm2: Settings → Profiles → (each profile used) → Advanced → Semantic History → "Run command…" → `/Users/jeanlescut/.local/bin/agent-chrome show --clicked \1`. A clicked `.html` opens on the desktop of the clicked iTerm2 window, in the window of that terminal's project (its tmux pane's folder, else the file's folder); any other path opens as before (`open`); on any error the path opens with `open` too, and `state/chrome/show-clicks.log` says why.
 
 ## Two modes: where the human answers
 

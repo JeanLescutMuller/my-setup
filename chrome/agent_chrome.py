@@ -212,11 +212,12 @@ CLICK_LOG = kit.STATE / 'show-clicks.log'   # --clicked has no terminal: what ha
 
 def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, cwd: str, ctx: dict) -> int:
     """Show the user a page (a file or a URL) in a Chrome window ON THIS SESSION'S DESKTOP: the desktop of the iTerm2
-    window that shows this session (--clicked: the iTerm2 window the user clicked in). One window per (profile,
-    desktop): a window of the profile already on that desktop gets a new tab; else, if that desktop is shown now, a new
-    window of the profile is opened and placed on that desktop's screen; else nothing opens (no program can put a
-    window on a desktop that is not shown). The profile: --profile, else the session's, else the project's
-    (--clicked: Claude - general); never the user's own. The page comes to the front. Returns the exit code: 0 shown,
+    window that shows this session (--clicked: the iTerm2 window the user clicked in). One window per project (two
+    projects on one desktop get two windows, even in the same profile): the window the kit opened for this project on
+    that desktop gets a new tab; else, if that desktop is shown now, a new window of the project's profile is opened
+    and placed on that desktop's screen; else nothing opens (no program can put a window on a desktop that is not
+    shown). The project: the session's, else the folder's (--clicked: the clicked terminal's folder, else the file's).
+    The profile: --profile, else the session's, else the project's (most: Claude - general); never the user's own. The page comes to the front. Returns the exit code: 0 shown,
     2 not shown (the reason printed), 3 no iTerm2 window shows this session (the user is on the phone: send an Artifact)."""
     import desktops as dk   # macOS calls: only this subcommand needs them
     me = f'{PROG} show'
@@ -232,8 +233,11 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
         subprocess.run(['open', str(path or url)])   # not a page: what iTerm2 does by default
         return 0
     d_sess = kit.session(sid)
-    profile = 'Claude - general' if clicked else (profile_arg or d_sess.get('profile') or kit.profile_for(cwd, ctx.get('project')))
+    if clicked:   # the project of the terminal clicked in (its tmux pane's folder), else of the file
+        cwd = dk.clicked_folder() or str(path.parent)
+        ctx = {**ctx, 'cwd': cwd, 'project': None}
     project = ctx.get('project') or kit.project_of(cwd)
+    profile = profile_arg or d_sess.get('profile') or kit.profile_for(cwd, project)
     l_ok = next((l for n, l in kit.D_DEVICE.values() if n == profile), None)
     if l_ok and project not in kit.projects_of(l_ok):
         print(f'{me}: refused: "{profile}" is only for {" or ".join(sorted(kit.projects_of(l_ok)))} (project here: {project})')
@@ -262,25 +266,24 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
     l_cg = dk.windows(pid)
     d_spaces = {w['id']: dk.spaces_of(w['id']) for w in l_cg}
     l_cg = [w for w in l_cg if d_spaces[w['id']]]   # Chrome's hidden helper windows are on no desktop
-    d_prof = dk.profiles(pid, l_cg)
     l_as = dk.chrome_windows(pid)
-    w = dk.pick(l_cg, d_prof, profile, space, d_spaces)
+    w = dk.pick(l_cg, dk.project_windows(l_cg), project, profile, space, d_spaces)
     as_id = w and dk.as_id_of(w['rect'], l_as)
-    ev = {'event': 'show', 'profile': profile, 'url': url, 'purpose': f'show the user {path or url}',
+    ev = {'event': 'show', 'project': project, 'profile': profile, 'url': url, 'purpose': f'show the user {path or url}',
           'message': f'on {where}' + (' (clicked)' if clicked else '')}
-    if as_id:   # reuse: a new tab in the window this profile already has on this desktop
+    if as_id:   # reuse: a new tab in the window the kit opened for this project on this desktop
         dk.osa(f'tell application "Google Chrome" to tell window id {as_id}\n'
                f' make new tab at end of tabs with properties {{URL:"{url}"}}\n'
                ' set active tab index to (count of tabs)\nend tell')
         if shown:
             dk.osa(f'tell application "Google Chrome"\n set index of window id {as_id} to 1\n activate\nend tell')
         kit.record([ev], ctx)
-        print(f'{me}: opened in a new tab of the "{profile}" window already on {where}'
+        print(f'{me}: opened in a new tab of project {project}\'s window ("{profile}") on {where}'
               + ('' if shown else ' (that desktop is not shown now: the tab waits there)') + '.')
         return 0
     if not shown:
-        print(f'{me}: not opened: this session\'s desktop ({where}) is not shown now, and "{profile}" has no window there '
-              f'that the kit knows. Ask the user to switch to it, then run this again; or give them the path: {path or url}')
+        print(f'{me}: not opened: this session\'s desktop ({where}) is not shown now, and project {project} has no '
+              f'window there. Ask the user to switch to it, then run this again; or give them the path: {path or url}')
         return 2
 
     # a new window of the profile; new windows open on the desktop shown on the focused screen: moved below if needed
@@ -302,11 +305,11 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
         time.sleep(0.5)
         on = dk.spaces_of(cg['id']) if cg else []
     if cg:
-        dk.remember({}, cg['id'], profile)
+        dk.remember(cg['id'], project, profile)
     dk.osa(f'tell application "Google Chrome"\n set index of window id {new["as_id"]} to 1\n activate\nend tell')
     kit.record([{**ev, 'event': 'show_window'}], ctx)
     if space in on:
-        print(f'{me}: opened a new "{profile}" window on {where} (checked).')
+        print(f'{me}: opened a new window for project {project} ("{profile}") on {where} (checked).')
         return 0
     print(f'{me}: WARNING: the new "{profile}" window is on {", ".join(dk.label(s, d_lay) for s in on) or "an unknown desktop"}, '
           f'not on {where}.')

@@ -265,6 +265,44 @@ def pick(l_cg: list, d_win: dict, project: str, profile: str, space: int, d_spac
                  and d_win[w['id']].get('profile') == profile and space in d_spaces.get(w['id'], [])), None)
 
 
+def screen_of(rect: tuple) -> tuple:
+    """The bounds (x, y, w, h) of the screen holding the middle of this window (else the first screen)."""
+    cx, cy = rect[0] + rect[2] / 2, rect[1] + rect[3] / 2
+    l_b = [s['bounds'] for s in screens().values()]
+    return next((b for b in l_b if b[0] <= cx < b[0] + b[2] and b[1] <= cy < b[1] + b[3]), l_b[0])
+
+
+# Waits for a Chrome window that is not in {known} AND shows the page {url} (up to 10 s; never another new window,
+# such as one the user opens at the same moment: 4 Nov 2026) and, if its top-left corner is off the screen
+# {sx},{sy}-{sr},{sb}, moves it to {tx},{ty} on that screen (its size kept, cut to fit); prints its id.
+MOVE_NEW_WINDOW = '''tell application "Google Chrome"
+ set known to {known}
+ repeat 500 times
+  repeat with i in (get id of every window)
+   set wid to contents of i
+   set u to ""
+   if known does not contain wid then
+    try
+     set u to URL of active tab of window id wid
+    end try
+   end if
+   if u starts with "{url}" then
+    set b to bounds of window id wid
+    if (item 1 of b) < {sx} or (item 1 of b) >= {sr} or (item 2 of b) < {sy} or (item 2 of b) >= {sb} then
+     set w to (item 3 of b) - (item 1 of b)
+     set h to (item 4 of b) - (item 2 of b)
+     if w > {sr} - {tx} then set w to {sr} - {tx}
+     if h > {sb} - {ty} then set h to {sb} - {ty}
+     set bounds of window id wid to {{{tx}, {ty}, {tx} + w, {ty} + h}}
+    end if
+    return wid as text
+   end if
+  end repeat
+  delay 0.02
+ end repeat
+end tell'''
+
+
 def as_id_of(rect: tuple, l_as: list) -> int | None:
     return next((w['as_id'] for w in l_as if w['rect'] == rect), None)
 

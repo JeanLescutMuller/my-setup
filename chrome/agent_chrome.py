@@ -288,24 +288,29 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
               f'window there. Ask the user to switch to it, then run this again; or give them the path: {path or url}')
         return 2
 
-    # a new window of the profile; new windows open on the desktop shown on the focused screen: moved below if needed
+    # A new window of the profile. Chrome puts it next to the last window used, maybe on the other screen, and ignores
+    # position options once running: a watcher started BEFORE the window moves it onto the terminal's screen (whose
+    # shown desktop is this one) as soon as Chrome lists it, in the same osascript: a few ms on the wrong desktop
+    # instead of ~1 s (user, 4 Nov 2026).
     s_as, s_cg = {x['as_id'] for x in l_as}, {x['id'] for x in dk.windows(pid)}
+    sx, sy, sw, sh = (int(v) for v in dk.screen_of(term_rect))
+    tx, ty = term_rect[0], term_rect[1]
+    watcher = subprocess.Popen(['osascript', '-e', dk.MOVE_NEW_WINDOW.format(
+        known='{' + ', '.join(map(str, sorted(s_as))) + '}', url=url.rstrip('/'), sx=sx, sy=sy, sr=sx + sw, sb=sy + sh, tx=tx, ty=ty)],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     subprocess.Popen([os.environ.get('CHROME_WINDOW_CMD') or CHROME_BIN, f'--profile-directory={folder}', '--new-window', url],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    t0, new = time.monotonic(), None
-    while time.monotonic() - t0 < 10 and not new:
-        time.sleep(0.3)
-        new = next((x for x in dk.chrome_windows(pid) if x['as_id'] not in s_as), None)
+    try:
+        out = watcher.communicate(timeout=15)[0].strip()
+    except subprocess.TimeoutExpired:
+        watcher.kill()
+        out = ''
+    new = next((x for x in dk.chrome_windows(pid) if str(x['as_id']) == out), None)
     if not new:
         print(f'{me}: Chrome did not open a window of "{profile}" within 10 s. Page: {path or url}')
         return 2
     cg = dk.cg_of(new['rect'], dk.windows(pid), exclude=s_cg) or {}
     on = dk.spaces_of(cg['id']) if cg else []
-    if space not in on and term_rect:   # opened on the other screen: put it on the terminal's screen (its shown desktop)
-        x, y, w_, h = term_rect
-        dk.osa(f'tell application "Google Chrome" to set bounds of window id {new["as_id"]} to {{{x}, {y}, {x + w_}, {y + h}}}')
-        time.sleep(0.5)
-        on = dk.spaces_of(cg['id']) if cg else []
     if cg:
         dk.remember(cg['id'], project, profile)
     dk.osa(f'tell application "Google Chrome"\n set index of window id {new["as_id"]} to 1\n activate\nend tell')

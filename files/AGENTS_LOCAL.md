@@ -8,14 +8,7 @@ The user has limited time, reads quickly, and does not read long prose. Make res
 
 - Keep answers short and lead with the result or next action.
 - When providing commands or code to execute, consolidate them into a single copy-pasteable code block whenever practical.
-- Proposing an HTML or Markdown file to the user (user, 2026-10-22; Markdown 2026-11-06):
-
-  | The user is working from | Give them |
-  |---|---|
-  | the laptop | the file's **full path** (`/Users/jeanlescut/…/page.html`, `…/README.md`), never a relative one: a click opens it in Chrome, in the project's profile, on the desktop of the terminal clicked in, Markdown formatted (skill `chrome`, `agent-chrome show`, which also opens it for them) |
-  | the phone (Remote Control, the Claude app), or a file on the VM (a click on the Mac cannot open it) | an **Artifact** (hosted on Anthropic's server) |
-
-  Not sure which: give both.
+- A page for the user to view (a website, an HTML or Markdown file): its **full link**, never shortened: `https://…`, or `file:///Users/jeanlescut/…/page.html` (or `.md`). A click opens it in Chrome, in the project's profile, on this desktop (skill `chrome`). On the phone, or a file on the VM: an **Artifact**; not sure: both (the user, 2026-10-22, 2026-11-06).
 
 ### Show, don't narrate
 
@@ -52,7 +45,7 @@ The user has repeatedly been lost by invented terminology. Therefore:
 
 - Token counts also as a % of Claude's window (1,000,000) and Codex's (258,400), 2 decimals; an inventory puts "at init" and "on use" in separate columns.
 - Name every script, notebook or file by its full path, and say which data it reads and writes.
-- A local file or folder given to the user is always its full absolute path (`/Users/jeanlescut/...`), never `~/...`, a relative path or a bare filename: only a full path is clickable in the terminal (the user, 2026-10-26).
+- A local file or folder given to the user is always its full absolute path (`/Users/jeanlescut/...`; a page to view: its `file://` link, above), never `~/...`, a relative path or a bare filename: only a full path is clickable in the terminal (the user, 2026-10-26).
 - A command for the user to run: the remote part of `ssh host '…'` is always single-quoted, or the Mac's shell expands `~` and `$` first.
 
 ## Re-orienting after a gap

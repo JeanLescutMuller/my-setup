@@ -218,7 +218,9 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
     and placed on that desktop's screen; else nothing opens (no program can put a window on a desktop that is not
     shown). The project: the session's, else the folder's (--clicked: the clicked terminal's folder, else the file's).
     The profile: --profile, else the session's, else the project's (most: Claude - general); never the user's own. The page comes to the front. Returns the exit code: 0 shown,
-    2 not shown (the reason printed), 3 no iTerm2 window shows this session (the user is on the phone: send an Artifact)."""
+    2 not shown (the reason printed), 3 no iTerm2 window shows this session (the user is on the phone: send an Artifact),
+    4 opened in the right profile but not placed (wherever Chrome put it) nor remembered: Chrome was asked, but the
+    kit could not see the window (the reason printed)."""
     import desktops as dk   # macOS calls: only this subcommand needs them
     me = f'{PROG} show'
     if re.match(r'[a-z][a-z0-9+.-]*://', target):
@@ -269,6 +271,24 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
     d_spaces = {w['id']: dk.spaces_of(w['id']) for w in l_cg}
     l_cg = [w for w in l_cg if d_spaces[w['id']]]   # Chrome's hidden helper windows are on no desktop
     l_as = dk.chrome_windows(pid)
+    # AppleScript speaks to ONE app named "Google Chrome": with a second visible Chrome running (its own data folder,
+    # e.g. a Playwright script), it may be that one. Then the kit sees none of the user's windows: it cannot reuse or
+    # place one, and must not take a missing window for "nothing opened" (5 Nov 2026: pwlayer.py of
+    # secrets-and-account-migration answered; the kit opened a window, saw nothing, and its `open` fallback opened a
+    # second one, in the user's own profile).
+    l_other = [p for p in kit.chrome_processes() if p['kind'] == 'visible']
+    if not any(dk.as_id_of(w['rect'], l_as) for w in l_cg) if l_cg else l_other:
+        why = (f'AppleScript does not reach the user\'s Chrome (pid {pid}): another Chrome answers it'
+               + ''.join(f' (pid {p["pid"]}, data folder {p["data_dir"]})' for p in l_other))
+        if not clicked:
+            print(f'{me}: not opened: {why}. Ask the user to stop that Chrome, or give them the path: {path or url}')
+            return 2
+        subprocess.Popen([os.environ.get('CHROME_WINDOW_CMD') or CHROME_BIN, f'--profile-directory={folder}', '--new-window', url],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        kit.record([{'event': 'show_window', 'project': project, 'profile': profile, 'url': url,
+                     'purpose': f'show the user {path or url}', 'message': f'not placed, wanted on {where} (clicked)'}], ctx)
+        print(f'{me}: opened a new "{profile}" window wherever Chrome put it (not placed, not remembered): {why}.')
+        return 4
     w = dk.pick(l_cg, dk.project_windows(l_cg), project, profile, space, d_spaces)
     as_id = w and dk.as_id_of(w['rect'], l_as)
     ev = {'event': 'show', 'project': project, 'profile': profile, 'url': url, 'purpose': f'show the user {path or url}',
@@ -306,9 +326,10 @@ def show(target: str, profile_arg: str | None, clicked: bool, sid: str | None, c
         watcher.kill()
         out = ''
     new = next((x for x in dk.chrome_windows(pid) if str(x['as_id']) == out), None)
-    if not new:
-        print(f'{me}: Chrome did not open a window of "{profile}" within 10 s. Page: {path or url}')
-        return 2
+    if not new:   # Chrome got the request: it may still open the window; opening another would make two
+        print(f'{me}: asked Chrome for a "{profile}" window, but did not see it within 15 s: not placed, not '
+              f'remembered. Page: {path or url}')
+        return 4
     cg = dk.cg_of(new['rect'], dk.windows(pid), exclude=s_cg) or {}
     on = dk.spaces_of(cg['id']) if cg else []
     if cg:
@@ -335,7 +356,7 @@ def show_clicked(target: str, ctx: dict):
     except Exception as e:   # noqa: BLE001: the click must still open something
         buf.write(f'error: {e!r}\n')
         rc = 1
-    if rc != 0:
+    if rc not in (0, 4):   # 4: Chrome was already asked for a window: a fallback would make a second one
         subprocess.run(['open', target])
     CLICK_LOG.parent.mkdir(parents=True, exist_ok=True)
     with open(CLICK_LOG, 'a') as f:

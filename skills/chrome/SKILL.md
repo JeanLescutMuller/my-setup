@@ -89,6 +89,7 @@ To show the user an HTML file or a URL (a report, a design, a README.html), run 
 ```
 this session's desktop: tmux session → its attached terminal → iTerm2 window → its desktop (macOS, read-only)
  ├─ no iTerm2 window shows the session (the user is on the phone)      → exit 3: send an Artifact instead
+ ├─ Chrome asked, window not seen (another Chrome answers AppleScript) → exit 4: opened somewhere, not placed; don't retry
  ├─ the kit already opened a window for this project on that desktop  → a new tab in it (one window per project)
  ├─ that desktop is shown now                                          → a new window of the project's profile, moved onto that screen if needed
  └─ that desktop is not shown (the user is on another one)             → exit 2, nothing opens: give the full path

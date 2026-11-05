@@ -206,7 +206,8 @@ def open_profile_window(project: str, sid: str | None, cwd: str, ctx: dict):
 
 
 # ---------------------------------------------------------------- show: a page for the user, on the session's desktop
-HTML = ('.html', '.htm')
+# what a click sends to Chrome: pages, and Markdown (the extension formats it; user, 6 Nov 2026)
+HTML = ('.html', '.htm', '.md', '.markdown')
 CLICK_LOG = kit.STATE / 'show-clicks.log'   # --clicked has no terminal: what happened goes here
 
 

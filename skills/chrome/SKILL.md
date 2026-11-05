@@ -84,7 +84,7 @@ Never in front of the user. Claude in Chrome actions (create a tab, navigate, cl
 
 ## Showing the user a page: `agent-chrome show`
 
-To show the user an HTML file or a URL (a report, a design, a README.html), run `agent-chrome show <full path or URL>` instead of `open`: the page opens **on the desktop of this session's terminal**, never on another desktop (the user, 4 Nov 2026). No authorize-tab needed: the user reads the page, no agent drives it.
+To show the user an HTML or Markdown file or a URL (a report, a design, a README.html or .md; Markdown is formatted by the extension "Agent tab notes", which needs "Allow access to file URLs" in each profile, else Chrome shows the raw text), run `agent-chrome show <full path or URL>` instead of `open`: the page opens **on the desktop of this session's terminal**, never on another desktop (the user, 4 Nov 2026). No authorize-tab needed: the user reads the page, no agent drives it.
 
 ```
 this session's desktop: tmux session → its attached terminal → iTerm2 window → its desktop (macOS, read-only)

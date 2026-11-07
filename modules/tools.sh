@@ -8,7 +8,7 @@
 # nothing points back into the clone.
 step "tools"
 
-TOOLS=(agent-session-manager agent-notify agent-statusline agent-usage-tracker)
+TOOLS=(agent-tracker agent-resume agent-notify agent-statusline)   # agent-tracker first: agent-resume reads its files (2026-11-07)
 
 for name in "${TOOLS[@]}"; do
     if [ "$INSTALL" = "false" ]; then

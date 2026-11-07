@@ -122,8 +122,9 @@ Reuse these instead of rebuilding them; read the named file before depending on 
 | `my-setup` | Mac/home setup: dotfiles, machine and tool skills | README |
 | `job-runner` | the wrapper for every scheduled job, statuses on a phone dashboard | DESIGN.md |
 | `agent-statusline` | Claude/Codex status line and its shared cache `~/opt/agent-statusline/state` | README |
-| `agent-usage-tracker` | quota %, tokens and $ for Claude and Codex, per machine | `FOR_READERS.md` |
-| `agent-session-manager` (`asm`) | session search, sync and resume across machines and agents | README |
+| `agent-tracker` (was agent-usage-tracker) | the data layer of Claude sessions: where each runs (pane, folder), its start/end, last seen; quota %, tokens and $ for Claude and Codex, per machine | `FOR_READERS.md` |
+| `agent-resume` (`ares`; was agent-session-manager, `asm`) | session search, sync and resume across machines and agents; `ares tmux` restores tmux and every Claude session after a crash | README |
+| `agent-auto-close` | closing idle Claude sessions (`close`, `idle --over N`) | README |
 | `agent-notify` | terminal notifications for concurrent sessions | README |
 | `tasks` | every task in Todoist, and the phone when it matters: the `task` command (add, edit, complete, delete); never your own Todoist or notification code | skill `tasks`; `task --help` |
 

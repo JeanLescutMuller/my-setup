@@ -3,7 +3,8 @@
 # create it (started in that folder) if not. Session name = folder name.
 #
 # Usage:
-#   tm                  # the current folder
+#   tm                  # the current folder; in ~ it is the session "general" (user, 2026-11-07)
+#   tm general          # the home folder, session "general", from anywhere
 #   tm robotics-radar   # ~/dev/robotics-radar (a bare name is looked up in ~/dev)
 #   tm ~/some/path      # any folder (an argument with a "/" or ".", or an existing folder)
 #
@@ -15,14 +16,20 @@
 set -euo pipefail
 
 arg="${1:-.}"
-if [[ "$arg" != */* && "$arg" != .* && ! -d "$arg" ]]; then
+if [ "$arg" = general ]; then
+    arg="$HOME"
+elif [[ "$arg" != */* && "$arg" != .* && ! -d "$arg" ]]; then
     arg="$HOME/dev/$arg"
 fi
 [ -d "$arg" ] || { echo "tm: no such folder: $arg" >&2; exit 1; }
 dir="$(cd "$arg" && pwd)"
 
-# tmux forbids "." and ":" in session names.
-name="$(basename "$dir" | tr '.:' '__')"
+if [ "$dir" = "$(cd "$HOME" && pwd)" ]; then
+    name=general
+else
+    # tmux forbids "." and ":" in session names.
+    name="$(basename "$dir" | tr '.:' '__')"
+fi
 
 if ! tmux has-session -t "=$name" 2>/dev/null; then
     tmux new-session -d -s "$name" -c "$dir"

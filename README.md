@@ -46,6 +46,7 @@ INSTALL=true bash bootstrap.sh gitconfig   # dotfiles (always checked) + one mod
 - `hammerspoon.sh` (macOS, 2026-10-21) — installs [Hammerspoon](https://www.hammerspoon.org) (`brew install --cask hammerspoon`) and deploys `files/hammerspoon_init.lua` → `~/opt/my-setup/hammerspoon/init.lua` ← `~/.hammerspoon/init.lua`: ⌥B / ⌥D / ⌥R send ⌘⌥⇧1/2/3, the shortcuts of the Blocks macro of the "Importants" Sheet (`data-organization`, `work/tools/sheet_blocks/`), only while that Sheet's Chrome window is in front. Once by hand: System Settings › Privacy & Security › Accessibility › Hammerspoon on. The config reloads by itself when its copy changes.
 
 **Notes and tools run by hand** (never deployed):
+- [`doc/macbook_sudden_shutdowns.md`](doc/macbook_sudden_shutdowns.md) — the MacBook switching itself off with no warning (2026-10-13, 2026-11-07): the cases, what is ruled out, the commands to investigate the next one
 - [`doc/shift_enter_over_ssh.md`](doc/shift_enter_over_ssh.md) — why Shift+Enter submits in Claude Code over plain SSH (use Ctrl+J there), works in tmux, and why nothing is patched; [`tools/terminal_key_probe.py`](tools/terminal_key_probe.py) measures the key bytes again after an update
 - [`tools/context_inventory.py`](tools/context_inventory.py) — what each Claude / Codex session loads at startup vs on use, in tokens
 

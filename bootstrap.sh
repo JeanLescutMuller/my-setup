@@ -112,8 +112,6 @@ _deploy_dotfile() {
 # mirrors DOTFILES: source name in files/, bin name on PATH.
 OWN_BINS=(
     "get_host_color.sh:get_host_color"
-    "cc_map.py:cc-map"
-    "cc_rc.py:cc-rc"
     "gws_login.sh:gws-login"
     "tm.sh:tm"
 )
@@ -254,6 +252,25 @@ for entry in "${OWN_BINS[@]}"; do
     _deploy_own_bin "${entry%%:*}" "${entry#*:}"
 done
 
+# Retired own binaries (parked in parked/, 2026-11-07): their copy, its .bak and their link go, the link only
+# when it points to our copy.
+RETIRED_BINS=(cc-map cc-rc)
+for _bin in "${RETIRED_BINS[@]}"; do
+    _target="$HOME/opt/my-setup/bin/$_bin"
+    _link="$HOME/.local/bin/$_bin"
+    _ours=false
+    [ -L "$_link" ] && [ "$(readlink "$_link")" = "$_target" ] && _ours=true
+    if [ ! -e "$_target" ] && [ ! -e "$_target.bak" ] && [ "$_ours" = false ]; then
+        ok "$_bin (retired, absent)"
+    elif [ "$INSTALL" = "false" ]; then
+        skip "remove retired $_bin"
+    else
+        [ "$_ours" = true ] && rm "$_link"
+        rm -f "$_target" "$_target.bak"
+        installed "removed retired $_bin"
+    fi
+done
+
 step "shell rc managed block"
 case "$(basename "$SHELL")" in
     zsh)
@@ -270,7 +287,7 @@ case "$(basename "$SHELL")" in
 esac
 
 # --- Modules: real logic (branching, external calls) lives here. ---
-MODULES=(dev_layout gitconfig agent_links my_context chrome_kit claude_config tools tmux_plugins remote_control hammerspoon)
+MODULES=(dev_layout gitconfig agent_links my_context chrome_kit claude_config tools remote_control hammerspoon)
 
 TARGET="${1:-}"
 if [ -n "$TARGET" ]; then

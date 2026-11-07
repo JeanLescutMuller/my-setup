@@ -11,7 +11,7 @@
 # Log: ~/opt/my-setup/logs/remote-control.log.
 # Restarted only when its script or plist changed: a restart ends every
 # session open from the phone (including the one running this, if any).
-# Turning /rc on in a running session is cc-rc's job (files/cc_rc.py), run by an agent.
+# Every interactive session turns /rc on by itself (remoteControlAtStartup, modules/claude_config.sh).
 
 step "remote control service"
 

@@ -2,7 +2,7 @@
 # Removes what modules/agent_links.sh deploys: the skill links
 # in ~/.claude/skills and ~/.agents/skills
 # (only links that point into ~/opt/my-setup), then the read-only copies
-# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), cc-map and cc-rc; the Hammerspoon config link (modules/hammerspoon.sh); the Chrome kit (modules/chrome_kit.sh: its code, chrome-claim, chrome-who, the Agent tab notes extension and its native host manifest, and its hook groups in ~/.claude/settings.json; its record in ~/opt/my-setup/state/chrome/ is kept).
+# they point to; what modules/my_context.sh links (its copy and history.git are kept); the remote control LaunchAgent (modules/remote_control.sh), and the links of cc-map and cc-rc if an older deploy left them (parked since 2026-11-07, parked/README.md); the Hammerspoon config link (modules/hammerspoon.sh); the Chrome kit (modules/chrome_kit.sh: its code, chrome-claim, chrome-who, the Agent tab notes extension and its native host manifest, and its hook groups in ~/.claude/settings.json; its record in ~/opt/my-setup/state/chrome/ is kept).
 # Dotfiles, the shell rc block, git config and the tools are left alone.
 #
 # Usage: bash uninstall.sh

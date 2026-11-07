@@ -270,7 +270,7 @@ case "$(basename "$SHELL")" in
 esac
 
 # --- Modules: real logic (branching, external calls) lives here. ---
-MODULES=(dev_layout gitconfig agent_links my_context chrome_kit claude_config tools remote_control hammerspoon)
+MODULES=(dev_layout gitconfig agent_links my_context chrome_kit claude_config tools tmux_plugins remote_control hammerspoon)
 
 TARGET="${1:-}"
 if [ -n "$TARGET" ]; then

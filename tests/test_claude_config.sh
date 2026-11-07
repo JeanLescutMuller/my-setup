@@ -25,11 +25,11 @@ run false
 check "check mode reports the change, writes nothing" 'bash $HOME/.claude/statusline-command.sh' "$(sl command)"
 check "check mode says skip" 1 "$(grep -c 'statusLine (want' "$S/run.log")"
 run
-check "agent-tracker installed: the chain" 'agent-tracker tick | bash $HOME/.claude/statusline-command.sh' "$(sl command)"
+check "agent-tracker installed: the chain" '(agent-tracker tick 2>/dev/null || cat) | bash $HOME/.claude/statusline-command.sh' "$(sl command)"
 check "refreshInterval still 10" 10 "$(sl refreshInterval)"
 run
 check "re-run: ok, unchanged" 1 "$(sed 's/\x1b\[[0-9;]*m//g' "$S/run.log" | grep -c '\[ok\] statusLine$')"
-check "re-run: same command" 'agent-tracker tick | bash $HOME/.claude/statusline-command.sh' "$(sl command)"
+check "re-run: same command" '(agent-tracker tick 2>/dev/null || cat) | bash $HOME/.claude/statusline-command.sh' "$(sl command)"
 
 # the chain itself runs: a fake display echoes what it got
 printf '#!/bin/bash\ncat\n' > "$HOME/.claude/statusline-command.sh"

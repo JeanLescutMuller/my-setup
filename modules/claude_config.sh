@@ -84,14 +84,15 @@ for key in respondToBashCommands theme cleanupPeriodDays autoMemoryEnabled skill
 done
 
 # statusLine: agent-statusline's display, fed by agent-tracker when it is installed (its bin exists):
-# `agent-tracker tick | bash $HOME/.claude/statusline-command.sh`. tick records the payload and copies it to
+# `(agent-tracker tick 2>/dev/null || cat) | bash $HOME/.claude/statusline-command.sh`: if agent-tracker is ever
+# missing, the command fails without reading stdin and cat passes the payload on, so the display never goes blank. tick records the payload and copies it to
 # stdout unchanged; owning the chain here means reinstalling or rewriting the display cannot drop the tracking
 # (agent-tracker's DESIGN.md §6). Without agent-tracker: the display alone. refreshInterval stays from the file.
 _sl_want=$(TRACKER="$([ -e "$HOME/.local/bin/agent-tracker" ] && echo 1)" DESIRED="$DESIRED" python3 -c '
 import json, os
 want = json.load(open(os.environ["DESIRED"]))["statusLine"]
 if os.environ["TRACKER"]:
-    want["command"] = "agent-tracker tick | " + want["command"]
+    want["command"] = "(agent-tracker tick 2>/dev/null || cat) | " + want["command"]
 print(json.dumps(want))
 ')
 _check_or_set_json statusLine "$_sl_want"

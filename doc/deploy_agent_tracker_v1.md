@@ -17,7 +17,7 @@ Written 2026-11-07 on branch `agent-tracker-v1` (agent-tracker's `IMPLEMENTATION
 
 | # | Path on this Mac | What it is | Who removes it |
 |---|---|---|---|
-| 1 | `~/.claude/settings.json` → `statusLine.command` | today `bash $HOME/.claude/statusline-command.sh`; becomes `agent-tracker tick \| bash $HOME/.claude/statusline-command.sh` | bootstrap (`modules/claude_config.sh`) |
+| 1 | `~/.claude/settings.json` → `statusLine.command` | today `bash $HOME/.claude/statusline-command.sh`; becomes `(agent-tracker tick 2>/dev/null \|\| cat) \| bash $HOME/.claude/statusline-command.sh` | bootstrap (`modules/claude_config.sh`) |
 | 2 | `~/.local/bin/cc-map`, `~/.local/bin/cc-rc` (links) | parked commands (`parked/README.md`) | bootstrap (`RETIRED_BINS`) |
 | 3 | `~/opt/my-setup/bin/cc-map`, `cc-map.bak`, `cc-rc` | their deployed copies | bootstrap (`RETIRED_BINS`) |
 | 4 | `~/.claude/skills/claude-sessions-overview`, `~/.agents/skills/claude-sessions-overview` (links), `~/opt/my-setup/skills/claude-sessions-overview/` (read-only copy) | parked skill | bootstrap (`modules/agent_links.sh`: a skill gone from `skills/` loses its copy and links) |

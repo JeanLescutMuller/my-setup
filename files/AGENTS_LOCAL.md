@@ -9,6 +9,7 @@ The user has limited time, reads quickly, and does not read long prose. Make res
 - Keep answers short and lead with the result or next action.
 - When providing commands or code to execute, consolidate them into a single copy-pasteable code block whenever practical.
 - A page for the user to view (a website, an HTML or Markdown file): its **full link**, never shortened: `https://…`, or `file:///Users/jeanlescut/…/page.html` (or `.md`). A click opens it in Chrome, in the project's profile, on this desktop (skill `chrome`). On the phone, or a file on the VM: an **Artifact**; not sure: both (the user, 2026-10-22, 2026-11-06).
+- Every link and every path given to the user is wrapped in backticks, `` `file:///Users/jeanlescut/…/page.html` ``, `` `https://…` ``, `` `/Users/jeanlescut/…` ``: the terminal shows it in blue, easy to spot (the user, 2026-11-07).
 
 ### Show, don't narrate
 
@@ -45,7 +46,7 @@ The user has repeatedly been lost by invented terminology. Therefore:
 
 - Token counts also as a % of Claude's window (1,000,000) and Codex's (258,400), 2 decimals; an inventory puts "at init" and "on use" in separate columns.
 - Name every script, notebook or file by its full path, and say which data it reads and writes.
-- A local file or folder given to the user is always its full absolute path (`/Users/jeanlescut/...`; a page to view: its `file://` link, above), never `~/...`, a relative path or a bare filename: only a full path is clickable in the terminal (the user, 2026-10-26).
+- A local file or folder given to the user is always its full absolute path (`/Users/jeanlescut/...`; a page to view: its `file://` link, above), never `~/...`, a relative path or a bare filename: only a full path is clickable in the terminal (the user, 2026-10-26); always in backticks (above, "Answering the user").
 - A command for the user to run: the remote part of `ssh host '…'` is always single-quoted, or the Mac's shell expands `~` and `$` first.
 
 ## Re-orienting after a gap

@@ -71,18 +71,18 @@ T = 249416209
 # Profiles
 check('Default profile refused', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': '7ffa990a-3bd4-46be-bf9e-871ec9870f9a'})) == 'deny')
 check('unknown profile refused', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': '12345678-0000'})) == 'deny')
-check('Facebook profile refused outside marketplace-seller', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'db5922d3-1713-4df0-a025-1ac608fac5f1'})) == 'deny')
-check('Facebook profile allowed in marketplace-seller', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'db5922d3-1713-4df0-a025-1ac608fac5f1'}, cwd='/Users/jeanlescut/dev/marketplace-seller')) is None)
+check('Bybit profile refused outside trading-bot', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'aeb98e0d-7abb-4b30-88be-b700e160d76e'})) == 'deny')
+check('Bybit profile allowed in trading-bot', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'aeb98e0d-7abb-4b30-88be-b700e160d76e'}, cwd='/Users/jeanlescut/dev/trading-bot')) is None)
 check('general profile allowed', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': GEN})) is None)
 hook('PostToolUse', C + 'select_browser', {'deviceId': GEN}, [{'type': 'text', 'text': 'Selected browser "Browser 1".'}])
 # One profile per session: the first selection fixes it
-d = hook('PreToolUse', C + 'select_browser', {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, cwd='/Users/jeanlescut/dev/job-applications')
-check('one profile per session: a 2nd profile refused, naming both', decision(d) == 'deny' and 'Claude - general' in reason(d) and 'Claude - LinkedIn' in reason(d))
+d = hook('PreToolUse', C + 'select_browser', {'deviceId': 'aeb98e0d-7abb-4b30-88be-b700e160d76e'}, cwd='/Users/jeanlescut/dev/trading-bot')
+check('one profile per session: a 2nd profile refused, naming both', decision(d) == 'deny' and 'Claude - general' in reason(d) and 'Claude - Bybit & Oxylabs' in reason(d))
 check('one profile per session: switch_browser refused once a profile is fixed', decision(hook('PreToolUse', C + 'switch_browser')) == 'deny')
 check('one profile per session: the same profile again allowed', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': GEN})) is None)
-hook('PostToolUse', C + 'switch_browser', {}, [{'type': 'text', 'text': 'Connected to ' + 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}], session_id='sess-S')
+hook('PostToolUse', C + 'switch_browser', {}, [{'type': 'text', 'text': 'Connected to ' + 'aeb98e0d-7abb-4b30-88be-b700e160d76e'}], session_id='sess-S')
 d = hook('PreToolUse', C + 'select_browser', {'deviceId': GEN}, session_id='sess-S')
-check('switch_browser fixes the profile when its answer names it', decision(d) == 'deny' and 'Claude - LinkedIn' in reason(d))
+check('switch_browser fixes the profile when its answer names it', decision(d) == 'deny' and 'Claude - Bybit & Oxylabs' in reason(d))
 # A reason before anything opens; a visible reason before a new tab
 d = hook('PreToolUse', C + 'tabs_create_mcp')
 check('tabs_create refused before an authorization, explaining it', decision(d) == 'deny' and 'authorize-tab' in reason(d) and '--visibility' in reason(d) and 'mark-as-needing-human' in reason(d))
@@ -206,12 +206,12 @@ check('focused: the tab entry carries visibility focused, its reason and the nee
 r = cli('agent_chrome.py', 'status')
 check('status shows visibility and its reason', 'visibility' in r.stdout and 'focused' in r.stdout and 'the human uploads a file' in r.stdout)
 # The authorized project: the profile check and status --mine use it
-cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'LinkedIn login', '--project', 'job-applications', CLAUDE_CODE_SESSION_ID='sess-P')
-check('profile check uses the authorized project: LinkedIn allowed for job-applications from another folder',
-      decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, session_id='sess-P')) is None)
-check('profile check uses the authorized project: LinkedIn refused for proj-x even from ~/dev/job-applications',
-      decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, cwd='/Users/jeanlescut/dev/job-applications', session_id='sess-F')) == 'deny')
-check('status --mine uses the authorized project', 'project job-applications' in cli('agent_chrome.py', 'status', '--mine', CLAUDE_CODE_SESSION_ID='sess-P').stdout)
+cli('agent_chrome.py', 'authorize-tab', '--mode', 'single', 'apply', '--visibility', 'unfocused', '--visibility-reason', 'LinkedIn login', '--project', 'trading-bot', CLAUDE_CODE_SESSION_ID='sess-P')
+check('profile check uses the authorized project: Bybit allowed for trading-bot from another folder',
+      decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'aeb98e0d-7abb-4b30-88be-b700e160d76e'}, session_id='sess-P')) is None)
+check('profile check uses the authorized project: Bybit refused for proj-x even from ~/dev/trading-bot',
+      decision(hook('PreToolUse', C + 'select_browser', {'deviceId': 'aeb98e0d-7abb-4b30-88be-b700e160d76e'}, cwd='/Users/jeanlescut/dev/trading-bot', session_id='sess-F')) == 'deny')
+check('status --mine uses the authorized project', 'project trading-bot' in cli('agent_chrome.py', 'status', '--mine', CLAUDE_CODE_SESSION_ID='sess-P').stdout)
 # A job without Bash says why in its environment (CHROME_PURPOSE), how visible (CHROME_VISIBILITY, default unfocused) and why
 ENV['CHROME_PURPOSE'] = 'auto-job-apply: apply to 3 jobs'
 d = hook('PreToolUse', C + 'tabs_create_mcp', session_id='sess-J')
@@ -254,7 +254,7 @@ check('the shell-launch refusal points to agent-chrome open-profile-window and s
 
 # agent-chrome open-profile-window: Claude in Chrome's profile not connected -> its window, in the background
 (tmp / 'Local State').write_text(json.dumps({'profile': {'info_cache': {'Default': {'name': 'me@x.ch'}, 'Profile 3': {'name': 'Claude - general'},
-                                                                        'Profile 6': {'name': 'Claude - LinkedIn'}}}}))
+                                                                        'Profile 8': {'name': 'Claude - Bybit & Oxylabs'}}}}))
 fake = tmp / 'fake_chrome.sh'      # the "Chrome binary": logs its arguments, then the extension reports the new window
 fake.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$CHROME_STATE/fake-args"\nmkdir -p "$CHROME_STATE/windows"\n'
                 'printf \'{"pid": %s, "profile": "Claude - general", "windows": [77]}\' "$KEEP_PID" > "$CHROME_STATE/windows/Claude - general.json"\n')
@@ -287,9 +287,9 @@ check('window: no live report, Local State says no window -> opened', r.returnco
 (tmp / 'state/fake-args').unlink(missing_ok=True)
 (tmp / 'Local State').write_text(ls_saved)
 ENV['CLAUDE_CODE_SESSION_ID'] = 'sess-L'
-(tmp / 'state/sessions/sess-L.json').write_text(json.dumps({'profile': 'Claude - LinkedIn'}))
+(tmp / 'state/sessions/sess-L.json').write_text(json.dumps({'profile': 'Claude - Bybit & Oxylabs'}))
 r = cli('agent_chrome.py', 'open-profile-window')
-check('window: the session\'s LinkedIn profile from another project -> refused', r.returncode != 0 and 'only for' in r.stderr)
+check('window: the session\'s Bybit profile from another project -> refused', r.returncode != 0 and 'only for' in r.stderr)
 ENV['CLAUDE_CODE_SESSION_ID'] = 'sess-W'
 ps_saved = ps.read_text()
 ps.write_text('')
@@ -428,7 +428,7 @@ check('authorize-tab --mode subagents for 2 subagents: one sessions file each', 
 check('the main agent stays unauthorized', not json.loads((tmp / f'state/sessions/{SM}.json').read_text()).get('purpose'))
 check('subagent A may select the session\'s browser', decision(hook('PreToolUse', C + 'select_browser', {'deviceId': GEN}, session_id=SM, agent_id=AA)) is None)
 check('subagent A may not select another profile (one per session)', decision(hook('PreToolUse', C + 'select_browser',
-      {'deviceId': 'f16617c3-d0dc-425b-a7a4-d925eec10bf5'}, session_id=SM, agent_id=AA, cwd='/Users/jeanlescut/dev/job-applications')) == 'deny')
+      {'deviceId': 'aeb98e0d-7abb-4b30-88be-b700e160d76e'}, session_id=SM, agent_id=AA, cwd='/Users/jeanlescut/dev/trading-bot')) == 'deny')
 check('subagent A: its first tab allowed', decision(hook('PreToolUse', C + 'tabs_context_mcp', {'createIfEmpty': True}, session_id=SM, agent_id=AA)) is None)
 hook('PostToolUse', C + 'tabs_context_mcp', {'createIfEmpty': True}, tabs((TA, 'New tab', '')), session_id=SM, agent_id=AA)
 check('subagent B: its own first tab allowed although the group has A\'s', decision(hook('PreToolUse', C + 'tabs_create_mcp', session_id=SM, agent_id=AB)) is None)

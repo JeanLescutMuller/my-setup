@@ -145,8 +145,7 @@ def front_window() -> str:
 
 def open_profile_window(project: str, sid: str | None, cwd: str, ctx: dict):
     """Claude in Chrome's profile is not connected: open a window of the session's profile (else the project's:
-    Claude - LinkedIn for job-applications, Claude - Facebook for marketplace-seller, Claude - Bybit & Oxylabs for
-    trading-bot, else Claude - general), only when that profile has no window, without taking focus; its first tab
+    Claude - Bybit & Oxylabs for trading-bot, else Claude - general), only when that profile has no window, without taking focus; its first tab
     names the project, and the kit extension makes it the project's agent window. The one sanctioned way to open a visible Chrome window from the shell (the
     hook refuses others). Exits non-zero with the reason if refused."""
     me = f'{PROG} open-profile-window'

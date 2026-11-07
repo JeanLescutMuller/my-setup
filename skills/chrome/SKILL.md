@@ -30,7 +30,7 @@ It does not limit sites or actions inside the tab: stay on what the user asked f
 
 ### 2. Which profile? (security)
 
-The table in CLAUDE.md ("Chrome profiles"): Claude - general → any project; Claude - LinkedIn → only job-applications; Claude - Facebook → only marketplace-seller; Claude - Bybit & Oxylabs → only trading-bot; the user's own profile → never (their password vault). `select_browser` by deviceId; **the first profile you select is fixed for the session**: the hook refuses another one. LinkedIn and a general site need two sessions. Profiles stop honest mistakes, not a malicious agent: no vault in any agent profile, each job's secrets only in its own `~/.config/<agent>/`.
+The table in CLAUDE.md ("Chrome profiles"): Claude - general → any project, LinkedIn and Facebook included (since 2026-11-07); Claude - Bybit & Oxylabs → only trading-bot; the user's own profile → never (their password vault). `select_browser` by deviceId; **the first profile you select is fixed for the session**: the hook refuses another one. Profiles stop honest mistakes, not a malicious agent: no vault in any agent profile, each job's secrets only in its own `~/.config/<agent>/`.
 
 ### 3. Headless, invisible? (the user's comfort)
 

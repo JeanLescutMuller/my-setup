@@ -84,9 +84,11 @@ def start(data_dir: Path, flags=()) -> int:
     major = re.search(r'(\d+)\.', subprocess.run([CHROME, '--version'], capture_output=True, text=True).stdout).group(1)
     ua = f'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{major}.0.0.0 Safari/537.36'
     subprocess.Popen([CHROME, '--headless', f'--user-data-dir={data_dir}', '--remote-debugging-port=0', '--no-first-run',
-                      '--no-default-browser-check', f'--user-agent={ua}', '--window-size=1440,900',
+                      '--no-default-browser-check', '--use-mock-keychain', f'--user-agent={ua}', '--window-size=1440,900',
                       '--disable-blink-features=AutomationControlled', *flags, 'about:blank'],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)  # outlives us if keep
+    # --use-mock-keychain: a throwaway Chrome never asks the macOS keychain for "Chrome Safe Storage"; started from an
+    # agent's sandboxed shell it cannot reach it, and macOS showed "Keychain Not Found ... Chrome" (the user, 2026-11-07)
     for _ in range(120):
         if (port := running_port(data_dir)):
             return port

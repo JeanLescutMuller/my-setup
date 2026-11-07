@@ -155,4 +155,5 @@ The user has very few tokens. For anything long or repeated (a build, a full tes
   Session: <$CLAUDE_CODE_SESSION_ID>         # Codex: $CODEX_THREAD_ID
   ```
 - Delete named files one at a time, by literal path, as their own step after looking at them; never `rm` a glob or a variable path, never inside a long command chain.
+- A test never reaches the user's tmux server: every tmux command in a test uses an explicit `-S <socket>`, never `TMUX_TMPDIR` alone (with `TMUX` set, tmux ignores it). Run a test that starts tmux, or tests code that calls tmux, under `/Users/jeanlescut/dev/agent-tracker/tests/tmux_guard.sh <command>`: it sends every tmux call to a throwaway server on its own socket (the user, 2026-11-07, after a test killed their tmux server).
 - The ntfy phone topic is for defcon-alert alarms only: never send anything to it, not even a test, unless the user asks in that very message.

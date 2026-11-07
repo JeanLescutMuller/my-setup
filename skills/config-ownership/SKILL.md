@@ -7,7 +7,7 @@ description: This machine's ownership map for ~/.claude/settings.json keys, and 
 
 No single tool owns this whole file — each owner manages specific keys and leaves the rest alone:
 
-- `respondToBashCommands`, `theme`, `statusLine`, `cleanupPeriodDays`, `claudeMdExcludes`, `autoMemoryEnabled`, `skillOverrides`, `pluginConfigs`, `permissions`, `remoteControlAtStartup` — owned by `my-setup` (`modules/claude_config.sh`)
+- `respondToBashCommands`, `theme`, `statusLine`, `cleanupPeriodDays`, `claudeMdExcludes`, `autoMemoryEnabled`, `skillOverrides`, `pluginConfigs`, `permissions`, `remoteControlAtStartup` — owned by `my-setup` (`modules/claude_config.sh`); `statusLine` is the chain `agent-tracker tick | bash $HOME/.claude/statusline-command.sh` when agent-tracker is installed, the display alone otherwise
 - `hooks` — shared: `agent-session-manager`'s own `install.sh` owns its `SessionStart`/`SessionEnd` groups; `my-setup` (`modules/claude_config.sh`) owns the groups whose command contains `opt/my-setup/chrome/hook.py` (the Chrome kit: PreToolUse ×2, PostToolUse, UserPromptSubmit, Stop). Each replaces only its own groups.
 - `env` → `CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_LOGS_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_ENDPOINT` only — owned by `agent-usage-tracker`'s own `install.sh` (`src/telemetry/merge_claude_env.py`); other `env` keys have no owner
 - `enabledPlugins`, `extraKnownMarketplaces` — owned by `notify`'s own `install.sh`

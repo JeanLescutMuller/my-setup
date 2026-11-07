@@ -34,6 +34,17 @@ Case 2, minute by minute:
 
 Not a clue: `sh`/`bash … triggered unnest of … DYLD shared region` lines appear just before both cuts, but 40–50 a minute all the time (status-line scripts).
 
+## Getting the sessions back after a cut
+
+A cut loses every tmux session and every Claude session in it. The restore is agent-resume's `ares tmux` (agent-tracker v1, 2026-11-07): it reads what agent-tracker recorded for the previous boot (each Claude session's `lifecycle.jsonl` and `last_seen.json` under `~/opt/agent-tracker/data/sessions/`), recreates each tmux session and window with its exact pane sizes, types `claude --resume <uuid>` in each Claude pane, opens plain panes in `~`, and opens one iTerm2 tab per tmux session.
+
+```
+ares tmux --dry-run     # the plan: what comes back, what is stale (skipped), what already exists (skipped)
+ares tmux               # do it; --all also restores the stale ones; --no-iterm skips the iTerm2 tabs
+```
+
+It replaces `tools/terminal_snapshot.py` (2026-11-01) and tmux-resurrect + continuum (2026-11-07, which brought a Claude pane back as an empty shell); both are removed from this repo.
+
 ## How to investigate (next time)
 
 Read-only, no sudo. `log` must be `/usr/bin/log` (zsh has its own `log`). Put big outputs in the session's scratchpad and grep them.

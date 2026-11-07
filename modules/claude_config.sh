@@ -14,6 +14,7 @@ step "claude config"
 SETTINGS="$HOME/.claude/settings.json"
 DESIRED="$SCRIPT_DIR/files/claude_settings.json"
 
+# $1 = key; $2 (optional) = the wanted value as JSON, else files/claude_settings.json's.
 _check_or_set_json() {
     local key="$1"
     local have want
@@ -28,12 +29,14 @@ except FileNotFoundError:
     data = {}
 print(json.dumps(data.get(key), sort_keys=True))
 ')
-    want=$(KEY="$key" DESIRED="$DESIRED" python3 -c '
+    want=$(KEY="$key" DESIRED="$DESIRED" WANT="${2:-}" python3 -c '
 import json, os
 key = os.environ["KEY"]
-with open(os.environ["DESIRED"]) as f:
-    data = json.load(f)
-print(json.dumps(data[key], sort_keys=True))
+if os.environ["WANT"]:
+    print(json.dumps(json.loads(os.environ["WANT"]), sort_keys=True))
+else:
+    with open(os.environ["DESIRED"]) as f:
+        print(json.dumps(json.load(f)[key], sort_keys=True))
 ')
 
     if [ "$have" = "$want" ]; then
@@ -41,7 +44,7 @@ print(json.dumps(data[key], sort_keys=True))
     elif [ "$INSTALL" = "false" ]; then
         skip "$key (want $want, have ${have:-<unset>})"
     else
-        KEY="$key" SETTINGS="$SETTINGS" DESIRED="$DESIRED" python3 -c '
+        KEY="$key" SETTINGS="$SETTINGS" WANT="$want" python3 -c '
 import json, os
 key = os.environ["KEY"]
 settings_path = os.environ["SETTINGS"]
@@ -51,9 +54,7 @@ try:
         data = json.load(f)
 except FileNotFoundError:
     data = {}
-with open(os.environ["DESIRED"]) as f:
-    desired = json.load(f)
-data[key] = desired[key]
+data[key] = json.loads(os.environ["WANT"])
 with open(settings_path, "w") as f:
     json.dump(data, f, indent=2)
     f.write("\n")
@@ -78,9 +79,23 @@ with open(settings_path, "w") as f:
 # asking (user, 2026-11-03: auto mode's classifier had blocked them as external writes).
 # remoteControlAtStartup: every interactive session turns on Remote Control (/rc) by itself, so it
 # shows in the Claude app (user, 2026-10-22).
-for key in respondToBashCommands theme statusLine cleanupPeriodDays autoMemoryEnabled skillOverrides pluginConfigs permissions remoteControlAtStartup; do
+for key in respondToBashCommands theme cleanupPeriodDays autoMemoryEnabled skillOverrides pluginConfigs permissions remoteControlAtStartup; do
     _check_or_set_json "$key"
 done
+
+# statusLine: agent-statusline's display, fed by agent-tracker when it is installed (its bin exists):
+# `(agent-tracker tick 2>/dev/null || cat) | bash $HOME/.claude/statusline-command.sh`: if agent-tracker is ever
+# missing, the command fails without reading stdin and cat passes the payload on, so the display never goes blank. tick records the payload and copies it to
+# stdout unchanged; owning the chain here means reinstalling or rewriting the display cannot drop the tracking
+# (agent-tracker's DESIGN.md §6). Without agent-tracker: the display alone. refreshInterval stays from the file.
+_sl_want=$(TRACKER="$([ -e "$HOME/.local/bin/agent-tracker" ] && echo 1)" DESIRED="$DESIRED" python3 -c '
+import json, os
+want = json.load(open(os.environ["DESIRED"]))["statusLine"]
+if os.environ["TRACKER"]:
+    want["command"] = "(agent-tracker tick 2>/dev/null || cat) | " + want["command"]
+print(json.dumps(want))
+')
+_check_or_set_json statusLine "$_sl_want"
 
 # Keys this module set before and no longer wants: removed. claudeMdExcludes
 # skipped ~/AGENTS.md, a copy of ~/.claude/CLAUDE.md that no longer exists.
